@@ -1,0 +1,8 @@
+// nested_import_test.byme
+from "utils/test.byme" import Status, myFunction;
+
+println("Status from utils/test.byme:", Status);
+
+// Verify isolation: ErrorCode should not be defined
+// (this would cause an analyzer error if uncommented, proving isolation!)
+// println("ErrorCode:", ErrorCode);

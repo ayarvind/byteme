@@ -38,6 +38,21 @@ func New(bytecode *compiler.Bytecode) *VM {
 	}
 }
 
+func NewWithGlobalStore(constants []object.Object, globals []object.Object) *VM {
+	frames := make([]*Frame, MaxFrames)
+	// We don't have a main fn here, just an empty frame since it will be overwritten or pushed
+	frames[0] = NewFrame(code.Instructions{}, 0)
+
+	return &VM{
+		constants:   constants,
+		globals:     globals,
+		stack:       make([]object.Object, StackSize),
+		sp:          0,
+		frames:      frames,
+		framesIndex: 1,
+	}
+}
+
 func (vm *VM) currentFrame() *Frame {
 	return vm.frames[vm.framesIndex-1]
 }
@@ -147,31 +162,90 @@ func (vm *VM) Run() error {
 			vm.currentFrame().ip += 1
 			
 			fn := vm.stack[vm.sp-1-numArgs]
-			if builtin, ok := fn.(*object.Builtin); ok {
+			switch fn := fn.(type) {
+			case *object.Builtin:
 				args := vm.stack[vm.sp-numArgs : vm.sp]
-				result := builtin.Fn(args...)
+				result := fn.Fn(args...)
 				vm.sp = vm.sp - numArgs - 1
 				if result != nil {
 					vm.push(result)
 				} else {
 					vm.push(object.NULL)
 				}
+			case *object.StructLiteral:
+				// Struct constructor: Point(x, y) → StructInstance{x: ..., y: ...}
+				if numArgs != len(fn.Fields) {
+					return fmt.Errorf("struct %s requires %d fields, got %d", fn.Name, len(fn.Fields), numArgs)
+				}
+				instance := &object.StructInstance{
+					Definition: fn,
+					Fields:     make(map[string]object.Object),
+				}
+				for i, field := range fn.Fields {
+					instance.Fields[field.Name.Value] = vm.stack[vm.sp-numArgs+i]
+				}
+				vm.sp = vm.sp - numArgs - 1
+				vm.push(instance)
+			case *object.CompiledFunction:
+				if numArgs != fn.NumParameters {
+					return fmt.Errorf("wrong number of arguments: want=%d, got=%d", fn.NumParameters, numArgs)
+				}
+				frame := NewFrame(fn.Instructions, vm.sp-numArgs)
+				vm.pushFrame(frame)
+				vm.sp = frame.basePointer + fn.NumLocals
+			default:
+				return fmt.Errorf("calling non-function and non-built-in: %T", fn)
 			}
+
+		case code.OpReturnValue:
+			returnValue := vm.pop()
+			frame := vm.popFrame()
+			vm.sp = frame.basePointer - 1
+			vm.push(returnValue)
+
+		case code.OpReturn:
+			frame := vm.popFrame()
+			vm.sp = frame.basePointer - 1
+			vm.push(object.NULL)
 
 		case code.OpSpawn:
 			numArgs := int(ins[ip+1])
 			vm.currentFrame().ip += 1
 			
 			fn := vm.stack[vm.sp-1-numArgs]
-			if builtin, ok := fn.(*object.Builtin); ok {
+			switch fn := fn.(type) {
+			case *object.Builtin:
 				args := make([]object.Object, numArgs)
 				copy(args, vm.stack[vm.sp-numArgs : vm.sp])
 				vm.sp = vm.sp - numArgs - 1
 				go func() {
-					builtin.Fn(args...)
+					fn.Fn(args...)
 				}()
 				err := vm.push(object.NULL)
 				if err != nil { return err }
+			case *object.CompiledFunction:
+				if numArgs != fn.NumParameters {
+					return fmt.Errorf("wrong number of arguments: want=%d, got=%d", fn.NumParameters, numArgs)
+				}
+				// Spawn a new VM!
+				newVM := NewWithGlobalStore(vm.constants, vm.globals)
+				
+				newVM.push(fn)
+				for i := vm.sp - numArgs; i < vm.sp; i++ {
+					newVM.push(vm.stack[i])
+				}
+				
+				vm.sp = vm.sp - numArgs - 1
+				vm.push(object.NULL)
+
+				go func() {
+					frame := NewFrame(fn.Instructions, newVM.sp-numArgs)
+					newVM.pushFrame(frame)
+					newVM.sp = frame.basePointer + fn.NumLocals
+					newVM.Run()
+				}()
+			default:
+				return fmt.Errorf("spawning non-function")
 			}
 
 		case code.OpArray:
@@ -190,6 +264,49 @@ func (vm *VM) Run() error {
 		case code.OpNull:
 			err := vm.push(object.NULL)
 			if err != nil { return err }
+
+		// ── Struct opcodes ────────────────────────────────────────────────
+		case code.OpStructDef:
+			// Push the StructLiteral (type definition) from the constant pool
+			constIdx := int(binary.BigEndian.Uint16(ins[ip+1:]))
+			vm.currentFrame().ip += 2
+			err := vm.push(vm.constants[constIdx])
+			if err != nil { return err }
+
+		case code.OpGetField:
+			// Stack: [..., instance]  → push instance.field
+			constIdx := int(binary.BigEndian.Uint16(ins[ip+1:]))
+			vm.currentFrame().ip += 2
+			fieldName := vm.constants[constIdx].(*object.String).Value
+			instance := vm.pop()
+			switch inst := instance.(type) {
+			case *object.StructInstance:
+				val, ok := inst.Fields[fieldName]
+				if !ok { vm.push(object.NULL) } else { vm.push(val) }
+			case *object.Map:
+				val, ok := inst.Pairs[fieldName]
+				if !ok { vm.push(object.NULL) } else { vm.push(val) }
+			default:
+				return fmt.Errorf("cannot access field '%s' on %s", fieldName, instance.Type())
+			}
+
+		case code.OpSetField:
+			// Stack: [..., instance, value]  → instance.field = value
+			constIdx := int(binary.BigEndian.Uint16(ins[ip+1:]))
+			vm.currentFrame().ip += 2
+			fieldName := vm.constants[constIdx].(*object.String).Value
+			value := vm.pop()
+			instance := vm.pop()
+			switch inst := instance.(type) {
+			case *object.StructInstance:
+				inst.Fields[fieldName] = value
+				vm.push(instance)
+			case *object.Map:
+				inst.Pairs[fieldName] = value
+				vm.push(instance)
+			default:
+				return fmt.Errorf("cannot set field '%s' on %s", fieldName, instance.Type())
+			}
 		}
 	}
 	return nil

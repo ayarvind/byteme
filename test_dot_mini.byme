@@ -1,0 +1,10 @@
+struct Point {
+    x: int,
+    y: int
+}
+let pt = Point(1, 2);
+let qt = Point(3, 4);
+println("pt.x =", pt.x);
+println("pt.y =", pt.y);
+println("qt.x =", qt.x);
+println("qt.y =", qt.y);

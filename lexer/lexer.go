@@ -151,7 +151,8 @@ func (l *Lexer) skipComment() {
 
 func (l *Lexer) readIdentifier() string {
 	position := l.position
-	for isLetter(l.ch) {
+	// First char is already verified to be a letter; subsequent chars can be letter, digit, or underscore
+	for isLetter(l.ch) || isDigit(l.ch) {
 		l.readChar()
 	}
 	return l.input[position:l.position]
@@ -160,11 +161,16 @@ func (l *Lexer) readIdentifier() string {
 func (l *Lexer) readNumber() (string, token.TokenType) {
 	position := l.position
 	tokenType := token.INT
-	for isDigit(l.ch) || l.ch == '.' {
-		if l.ch == '.' {
-			tokenType = token.FLOAT
-		}
+	for isDigit(l.ch) {
 		l.readChar()
+	}
+	// Only treat '.' as decimal if the next char is also a digit (avoids eating struct dot access)
+	if l.ch == '.' && isDigit(l.peekChar()) {
+		tokenType = token.FLOAT
+		l.readChar() // consume '.'
+		for isDigit(l.ch) {
+			l.readChar()
+		}
 	}
 	return l.input[position:l.position], tokenType
 }

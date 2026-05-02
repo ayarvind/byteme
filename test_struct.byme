@@ -1,0 +1,88 @@
+// ============================================================
+// test_struct.byme — Struct & Namespace feature test for ByteMe VM
+// ============================================================
+
+// ── 1. Basic struct definition and instantiation ─────────────
+struct Point {
+    x: int,
+    y: int
+}
+
+let p = Point(10, 20);
+println("=== Struct: Point ===");
+println("p.x =", p.x);
+println("p.y =", p.y);
+
+// ── 2. Struct with string field ───────────────────────────────
+struct Person {
+    name: string,
+    age:  int
+}
+
+let alice = Person("Alice", 30);
+println("\n=== Struct: Person ===");
+println("Name:", alice.name);
+println("Age :", alice.age);
+
+// ── 3. Struct returned from a function ───────────────────────
+struct Rect {
+    width:  int,
+    height: int,
+    area:   int
+}
+
+fn makeRect(w: int, h: int) -> Rect {
+    return Rect(w, h, w * h);
+}
+
+let r = makeRect(5, 8);
+println("\n=== Struct: Rect (from function) ===");
+println("Width :", r.width);
+println("Height:", r.height);
+println("Area  :", r.area);
+
+// ── 4. Multiple struct instances ─────────────────────────────
+let p0 = Point(1, 2);
+let p1 = Point(3, 4);
+let p2 = Point(5, 6);
+println("\n=== Multiple Struct Instances ===");
+println("p0.x =", p0.x, " p0.y =", p0.y);
+println("p1.x =", p1.x, " p1.y =", p1.y);
+println("p2.x =", p2.x, " p2.y =", p2.y);
+
+// ── 5. Namespace test ─────────────────────────────────────────
+namespace MathUtils {
+    fn square(n: int) -> int {
+        return n * n;
+    }
+
+    fn abs(n: int) -> int {
+        if (n < 0) {
+            return n * -1;
+        }
+        return n;
+    }
+}
+
+println("\n=== Namespace: MathUtils ===");
+println("square(7) =", MathUtils.square(7));
+println("abs(-15) =", MathUtils.abs(-15));
+
+// ── 6. Struct + namespace together ───────────────────────────
+struct Vector {
+    x: int,
+    y: int
+}
+
+namespace VectorOps {
+    fn magnitude(v: Vector) -> int {
+        return MathUtils.square(v.x) + MathUtils.square(v.y);
+    }
+}
+
+let v = Vector(3, 4);
+println("\n=== Struct + Namespace: Vector magnitude (x²+y²) ===");
+println("v.x =", v.x, " v.y =", v.y);
+println("magnitude² =", VectorOps.magnitude(v));
+
+println("\n=== All struct and namespace tests passed! ===");

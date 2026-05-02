@@ -72,6 +72,14 @@ type Function struct {
 func (f *Function) Type() ObjectType { return FUNCTION_OBJ }
 func (f *Function) Inspect() string  { return "fn" }
 
+type CompiledFunction struct {
+	Instructions []byte
+	NumLocals    int
+	NumParameters int
+}
+func (cf *CompiledFunction) Type() ObjectType { return "COMPILED_FUNCTION" }
+func (cf *CompiledFunction) Inspect() string  { return fmt.Sprintf("CompiledFunction[%p]", cf) }
+
 // Future represents a value that will be available later (for async/await)
 type Future struct {
 	ValueChan chan Object

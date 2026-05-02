@@ -1,0 +1,26 @@
+// ByteMe — jsonParse + mapGet usage demo
+// No dot operator! Use mapGet(obj, "key") for all field access.
+
+println("--- Build a map and stringify to JSON ---");
+let payload = map();
+mapSet(payload, "status", "success");
+mapSet(payload, "code", 200);
+mapSet(payload, "message", "Hello from ByteMe!");
+
+let jsonStr = jsonStringify(payload);
+println("Serialized:", jsonStr);
+
+println("\n--- Parse JSON string back into a map ---");
+let parsed = jsonParse(jsonStr);
+println("Status :", mapGet(parsed, "status"));
+println("Code   :", mapGet(parsed, "code"));
+println("Message:", mapGet(parsed, "message"));
+
+println("\n--- Nested JSON with mapGet chaining ---");
+let raw = "{\"user\":{\"name\":\"Aryan\",\"role\":\"admin\"},\"meta\":{\"version\":3}}";
+let doc = jsonParse(raw);
+let user = mapGet(doc, "user");
+let meta = mapGet(doc, "meta");
+println("User name :", mapGet(user, "name"));
+println("User role :", mapGet(user, "role"));
+println("API version:", mapGet(meta, "version"));

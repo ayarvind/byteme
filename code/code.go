@@ -38,6 +38,10 @@ const (
 	OpSpawn
 	OpSend
 	OpReceive
+	OpStructDef  // push a StructLiteral (type definition) onto stack
+	OpStructNew  // pop args + StructLiteral, construct StructInstance
+	OpGetField   // pop instance, push field value   (operand: const-idx of field name string)
+	OpSetField   // pop value + instance, set field  (operand: const-idx of field name string)
 )
 
 type Definition struct {
@@ -74,6 +78,10 @@ var definitions = map[Opcode]*Definition{
 	OpSpawn:         {"OpSpawn", []int{1}}, // 1-byte number of arguments
 	OpSend:          {"OpSend", []int{}},
 	OpReceive:       {"OpReceive", []int{}},
+	OpStructDef:     {"OpStructDef", []int{2}},      // operand: constant-pool index of StructLiteral
+	OpStructNew:     {"OpStructNew", []int{1}},      // operand: number of field args passed positionally
+	OpGetField:      {"OpGetField", []int{2}},       // operand: constant-pool index of field-name string
+	OpSetField:      {"OpSetField", []int{2}},       // operand: constant-pool index of field-name string
 }
 
 func Lookup(op byte) (*Definition, error) {

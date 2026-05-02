@@ -17,18 +17,38 @@ type Bytecode struct {
 	Constants    []object.Object
 }
 
+type EmittedInstruction struct {
+	Opcode   code.Opcode
+	Position int
+}
+
 type Compiler struct {
-	instructions code.Instructions
-	constants    []object.Object
-	symbolTable  *SymbolTable
+	instructions     code.Instructions
+	constants        *[]object.Object
+	symbolTable      *SymbolTable
+	lastInstruction  EmittedInstruction
 }
 
 func New() *Compiler {
+	constants := make([]object.Object, 0)
 	return &Compiler{
 		instructions: code.Instructions{},
-		constants:    []object.Object{},
+		constants:    &constants,
 		symbolTable:  NewSymbolTable(),
 	}
+}
+
+func NewWithState(s *SymbolTable, constants *[]object.Object) *Compiler {
+	return &Compiler{
+		instructions: code.Instructions{},
+		constants:    constants,
+		symbolTable:  s,
+	}
+}
+
+func NewEnclosedCompiler(outer *Compiler) *Compiler {
+	s := NewEnclosedSymbolTable(outer.symbolTable)
+	return NewWithState(s, outer.constants)
 }
 
 func (c *Compiler) Compile(node ast.Node) error {
@@ -85,6 +105,11 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 		return nil
 
+	case *ast.ReturnStatement:
+		err := c.Compile(n.ReturnValue)
+		if err != nil { return err }
+		c.emit(code.OpReturnValue)
+
 	case *ast.ExpressionStatement:
 		err := c.Compile(n.Expression)
 		if err != nil {
@@ -93,16 +118,41 @@ func (c *Compiler) Compile(node ast.Node) error {
 		c.emit(code.OpPop)
 
 	case *ast.InfixExpression:
-		// Reordering for GreaterThan logic
+		// ── Dot operator ──────────────────────────────────────────────────
+		if n.Operator == "." {
+			ident, ok := n.Right.(*ast.Identifier)
+			if !ok {
+				return fmt.Errorf("right side of '.' must be a field/method name")
+			}
+
+			// Check if left side is a namespace identifier (flat compound symbol)
+			if leftIdent, ok := n.Left.(*ast.Identifier); ok {
+				compoundKey := leftIdent.Value + "." + ident.Value
+				if sym, ok := c.symbolTable.Resolve(compoundKey); ok {
+					// It's a namespace method — emit a direct variable get
+					if sym.Scope == GlobalScope {
+						c.emit(code.OpGetGlobal, sym.Index)
+					} else {
+						c.emit(code.OpGetLocal, sym.Index)
+					}
+					return nil
+				}
+			}
+
+			// Otherwise treat as struct field access
+			err := c.Compile(n.Left)
+			if err != nil { return err }
+			fieldNameIdx := c.addConstant(&object.String{Value: ident.Value})
+			c.emit(code.OpGetField, fieldNameIdx)
+			return nil
+		}
+
+		// Reordering for LessThan logic
 		if n.Operator == "<" {
 			err := c.Compile(n.Right)
-			if err != nil {
-				return err
-			}
+			if err != nil { return err }
 			err = c.Compile(n.Left)
-			if err != nil {
-				return err
-			}
+			if err != nil { return err }
 			c.emit(code.OpGreaterThan)
 			return nil
 		}
@@ -221,6 +271,15 @@ func (c *Compiler) Compile(node ast.Node) error {
 			if err != nil { return err }
 		}
 
+	case *ast.TryStatement:
+		// MVP: just compile the body and finally sequentially.
+		err := c.Compile(n.Body)
+		if err != nil { return err }
+		if n.Finally != nil {
+			err = c.Compile(n.Finally)
+			if err != nil { return err }
+		}
+
 	case *ast.Identifier:
 		// Check for built-ins
 		if index, ok := builtins[n.Value]; ok {
@@ -239,6 +298,93 @@ func (c *Compiler) Compile(node ast.Node) error {
 			c.emit(code.OpGetLocal, symbol.Index)
 		}
 
+	case *ast.StructLiteral:
+		if n.Name != nil {
+			// Build the StructLiteral object and store it in the constant pool
+			fields := make([]*ast.Parameter, len(n.Fields))
+			copy(fields, n.Fields)
+			structDef := &object.StructLiteral{
+				Name:   n.Name.Value,
+				Fields: fields,
+			}
+			constIdx := c.addConstant(structDef)
+			c.emit(code.OpStructDef, constIdx)
+
+			// Bind the constructor to a global/local symbol
+			symbol := c.symbolTable.Define(n.Name.Value)
+			if symbol.Scope == GlobalScope {
+				c.emit(code.OpSetGlobal, symbol.Index)
+			} else {
+				c.emit(code.OpSetLocal, symbol.Index)
+			}
+			c.emit(code.OpNull) // balance stack for ExpressionStatement OpPop
+		} else {
+			c.emit(code.OpNull)
+		}
+
+	case *ast.InterfaceStatement:
+		if n.Name != nil {
+			symbol := c.symbolTable.Define(n.Name.Value)
+			c.emit(code.OpNull)
+			if symbol.Scope == GlobalScope {
+				c.emit(code.OpSetGlobal, symbol.Index)
+			} else {
+				c.emit(code.OpSetLocal, symbol.Index)
+			}
+		}
+		c.emit(code.OpNull)
+
+	case *ast.EnumStatement:
+		if n.Name != nil {
+			symbol := c.symbolTable.Define(n.Name.Value)
+			c.emit(code.OpNull)
+			if symbol.Scope == GlobalScope {
+				c.emit(code.OpSetGlobal, symbol.Index)
+			} else {
+				c.emit(code.OpSetLocal, symbol.Index)
+			}
+		}
+		c.emit(code.OpNull)
+
+	case *ast.FunctionLiteral:
+		if n.Name != nil {
+			// Define the name before compiling body to allow recursion
+			c.symbolTable.Define(n.Name.Value)
+		}
+
+		enclosedCompiler := NewEnclosedCompiler(c)
+
+		for _, p := range n.Parameters {
+			enclosedCompiler.symbolTable.Define(p.Name.Value)
+		}
+
+		err := enclosedCompiler.Compile(n.Body)
+		if err != nil { return err }
+
+		if !enclosedCompiler.lastInstructionIs(code.OpReturnValue) && !enclosedCompiler.lastInstructionIs(code.OpReturn) {
+			enclosedCompiler.emit(code.OpReturn)
+		}
+
+		compiledFn := &object.CompiledFunction{
+			Instructions:  enclosedCompiler.instructions,
+			NumLocals:     enclosedCompiler.symbolTable.numDefinitions,
+			NumParameters: len(n.Parameters),
+		}
+
+		c.emit(code.OpConstant, c.addConstant(compiledFn))
+
+		if n.Name != nil {
+			symbol, _ := c.symbolTable.Resolve(n.Name.Value)
+			if symbol.Scope == GlobalScope {
+				c.emit(code.OpSetGlobal, symbol.Index)
+			} else {
+				c.emit(code.OpSetLocal, symbol.Index)
+			}
+			// Since OpSetGlobal/Local pops the stack, we push a null
+			// so that the wrapping ExpressionStatement's OpPop doesn't panic.
+			c.emit(code.OpNull)
+		}
+
 	case *ast.CallExpression:
 		err := c.Compile(n.Function)
 		if err != nil { return err }
@@ -248,7 +394,54 @@ func (c *Compiler) Compile(node ast.Node) error {
 			if err != nil { return err }
 		}
 
+		// If the callee is a StructLiteral (resolved from symbol table),
+		// emit OpStructNew instead of OpCall so the VM constructs an instance.
+		// We detect this by checking if the function expression is an Identifier
+		// that resolves to a StructLiteral in constants — the VM handles this distinction.
 		c.emit(code.OpCall, len(n.Arguments))
+
+	case *ast.NamespaceLiteral:
+		nsName := n.Name.Value
+		// Register the namespace name itself as a symbol (resolves to NULL; its methods live under compound keys)
+		symbol := c.symbolTable.Define(nsName)
+		c.emit(code.OpNull)
+		if symbol.Scope == GlobalScope {
+			c.emit(code.OpSetGlobal, symbol.Index)
+		} else {
+			c.emit(code.OpSetLocal, symbol.Index)
+		}
+
+		// Compile each function/var in the body under "NamespaceName.memberName"
+		for _, stmt := range n.Body.Statements {
+			switch s := stmt.(type) {
+			case *ast.ExpressionStatement:
+				if fnLit, ok := s.Expression.(*ast.FunctionLiteral); ok && fnLit.Name != nil {
+					compoundName := nsName + "." + fnLit.Name.Value
+					// Compile the function body into a CompiledFunction
+					enclosedCompiler := NewEnclosedCompiler(c)
+					for _, p := range fnLit.Parameters {
+						enclosedCompiler.symbolTable.Define(p.Name.Value)
+					}
+					if err := enclosedCompiler.Compile(fnLit.Body); err != nil { return err }
+					if !enclosedCompiler.lastInstructionIs(code.OpReturnValue) && !enclosedCompiler.lastInstructionIs(code.OpReturn) {
+						enclosedCompiler.emit(code.OpReturn)
+					}
+					compiledFn := &object.CompiledFunction{
+						Instructions:  enclosedCompiler.instructions,
+						NumLocals:     enclosedCompiler.symbolTable.numDefinitions,
+						NumParameters: len(fnLit.Parameters),
+					}
+					c.emit(code.OpConstant, c.addConstant(compiledFn))
+					sym := c.symbolTable.Define(compoundName)
+					if sym.Scope == GlobalScope {
+						c.emit(code.OpSetGlobal, sym.Index)
+					} else {
+						c.emit(code.OpSetLocal, sym.Index)
+					}
+				}
+			}
+		}
+		c.emit(code.OpNull) // balance for ExpressionStatement OpPop
 
 	case *ast.SpawnExpression:
 		err := c.Compile(n.Call.Function)
@@ -286,19 +479,29 @@ var builtins = map[string]int{
 func (c *Compiler) Bytecode() *Bytecode {
 	return &Bytecode{
 		Instructions: c.instructions,
-		Constants:    c.constants,
+		Constants:    *c.constants,
 	}
 }
 
 func (c *Compiler) addConstant(obj object.Object) int {
-	c.constants = append(c.constants, obj)
-	return len(c.constants) - 1
+	*c.constants = append(*c.constants, obj)
+	return len(*c.constants) - 1
 }
 
 func (c *Compiler) emit(op code.Opcode, operands ...int) int {
 	ins := code.Make(op, operands...)
 	pos := c.addInstruction(ins)
+
+	c.lastInstruction = EmittedInstruction{Opcode: op, Position: pos}
+
 	return pos
+}
+
+func (c *Compiler) lastInstructionIs(op code.Opcode) bool {
+	if len(c.instructions) == 0 {
+		return false
+	}
+	return c.lastInstruction.Opcode == op
 }
 
 func (c *Compiler) addInstruction(ins []byte) int {

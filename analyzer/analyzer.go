@@ -70,6 +70,9 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 	switch n := node.(type) {
 	case *ast.Program:
 		for _, stmt := range n.Statements {
+			a.preScan(stmt)
+		}
+		for _, stmt := range n.Statements {
 			a.Analyze(stmt)
 		}
 
@@ -171,10 +174,10 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 
 	case *ast.InfixExpression:
 		if n.Operator == "." {
+			// Dot is valid on struct instances (type "type") and unknowns ("any")
 			leftType := a.Analyze(n.Left)
-			if leftType != "namespace" && leftType != "any" && leftType != "type" {
-				a.error("cannot use dot operator on type %s", leftType)
-				return "any"
+			if leftType != "type" && leftType != "any" && leftType != "namespace" {
+				a.error("cannot use dot operator on type '%s' — only struct instances support field access", leftType)
 			}
 			return "any"
 		}
