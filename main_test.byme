@@ -1,0 +1,5 @@
+// main_test.byme
+from "math.byme" import PI, magicNumber;
+
+println("PI from math module is:", PI);
+println("Magic Number from math module is:", magicNumber);

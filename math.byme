@@ -1,0 +1,6 @@
+// math.byme
+let PI = 3;
+
+// A pseudo-function for square since we don't have function compilation yet
+// Actually, I can use a global variable to simulate exported data
+let magicNumber = 42;

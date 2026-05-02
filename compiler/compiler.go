@@ -2,9 +2,14 @@ package compiler
 
 import (
 	"fmt"
+	"io/ioutil"
+	
 	"github.com/byteme/compiler/ast"
 	"github.com/byteme/compiler/code"
+	"github.com/byteme/compiler/lexer"
 	"github.com/byteme/compiler/object"
+	"github.com/byteme/compiler/parser"
+	"github.com/byteme/compiler/token"
 )
 
 type Bytecode struct {
@@ -35,6 +40,50 @@ func (c *Compiler) Compile(node ast.Node) error {
 				return err
 			}
 		}
+
+	case *ast.ImportStatement:
+		filename := n.Path.Value
+		input, err := ioutil.ReadFile(filename)
+		if err != nil {
+			return fmt.Errorf("could not read imported file %s: %s", filename, err)
+		}
+		
+		l := lexer.New(string(input))
+		p := parser.New(l)
+		program := p.ParseProgram()
+		
+		if len(p.Errors()) != 0 {
+			return fmt.Errorf("parser errors in imported file %s: %v", filename, p.Errors())
+		}
+		
+		// If it's a 'from' import, we hide the module's variables from the global scope,
+		// except for the specifically imported ones.
+		var savedStore map[string]Symbol
+		if n.Token.Type == token.FROM {
+			savedStore = make(map[string]Symbol)
+			for k, v := range c.symbolTable.store { savedStore[k] = v }
+		}
+
+		err = c.Compile(program)
+		if err != nil { return err }
+
+		if n.Token.Type == token.FROM {
+			newStore := make(map[string]Symbol)
+			// keep original globals
+			for k, v := range savedStore { newStore[k] = v }
+			
+			// keep specifically imported symbols
+			for _, imp := range n.Imports {
+				if sym, ok := c.symbolTable.store[imp.Value]; ok {
+					newStore[imp.Value] = sym
+				} else {
+					return fmt.Errorf("imported symbol %s not found in module %s", imp.Value, filename)
+				}
+			}
+			c.symbolTable.store = newStore
+		}
+
+		return nil
 
 	case *ast.ExpressionStatement:
 		err := c.Compile(n.Expression)
@@ -105,12 +154,23 @@ func (c *Compiler) Compile(node ast.Node) error {
 		integer := &object.Integer{Value: n.Value}
 		c.emit(code.OpConstant, c.addConstant(integer))
 
+	case *ast.StringLiteral:
+		str := &object.String{Value: n.Value}
+		c.emit(code.OpConstant, c.addConstant(str))
+
 	case *ast.BooleanLiteral:
 		if n.Value {
 			c.emit(code.OpTrue)
 		} else {
 			c.emit(code.OpFalse)
 		}
+
+	case *ast.ArrayLiteral:
+		for _, el := range n.Elements {
+			err := c.Compile(el)
+			if err != nil { return err }
+		}
+		c.emit(code.OpArray, len(n.Elements))
 
 	case *ast.LetStatement:
 		err := c.Compile(n.Value)
@@ -189,6 +249,17 @@ func (c *Compiler) Compile(node ast.Node) error {
 		}
 
 		c.emit(code.OpCall, len(n.Arguments))
+
+	case *ast.SpawnExpression:
+		err := c.Compile(n.Call.Function)
+		if err != nil { return err }
+
+		for _, arg := range n.Call.Arguments {
+			err := c.Compile(arg)
+			if err != nil { return err }
+		}
+
+		c.emit(code.OpSpawn, len(n.Call.Arguments))
 	}
 
 	return nil
@@ -206,6 +277,10 @@ var builtins = map[string]int{
 	"mapGet":        8,
 	"fileRead":      9,
 	"fileWrite":     10,
+	"map":           11,
+	"chan":          12,
+	"send":          13,
+	"recv":          14,
 }
 
 func (c *Compiler) Bytecode() *Bytecode {

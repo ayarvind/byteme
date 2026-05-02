@@ -1,0 +1,22 @@
+// test_concurrency.byme
+
+let c = chan();
+
+// Define a simulated worker using spawn
+spawn timeSleep(500);
+
+// We can use a trick to send data back and forth
+let sender = chan();
+let receiver = chan();
+
+// However since we don't have user-defined functions in the VM yet,
+// we'll just demonstrate the channel built-ins in the main thread
+
+println("Starting channel test...");
+
+spawn send(c, "Hello from the future!");
+
+println("Waiting for message...");
+let msg = recv(c);
+
+println("Received:", msg);

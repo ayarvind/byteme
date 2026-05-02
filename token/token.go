@@ -67,6 +67,8 @@ const (
 	INTERFACE TokenType = "INTERFACE"
 	IMPLEMENTS TokenType = "IMPLEMENTS"
 	ENUM      TokenType = "ENUM"
+	IMPORT    TokenType = "IMPORT"
+	FROM      TokenType = "FROM"
 )
 
 type Token struct {
@@ -99,6 +101,8 @@ var keywords = map[string]TokenType{
 	"interface": INTERFACE,
 	"implements": IMPLEMENTS,
 	"enum":      ENUM,
+	"import":    IMPORT,
+	"from":      FROM,
 	"@":         AT,
 }
 

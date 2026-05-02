@@ -182,9 +182,68 @@ func (p *Parser) parseStatement() ast.Statement {
 		return p.parseInterfaceStatement()
 	case token.ENUM:
 		return p.parseEnumStatement()
+	case token.IMPORT:
+		return p.parseImportStatement()
+	case token.FROM:
+		return p.parseFromImportStatement()
 	default:
 		return p.parseExpressionStatement()
 	}
+}
+
+func (p *Parser) parseFromImportStatement() *ast.ImportStatement {
+	stmt := &ast.ImportStatement{Token: p.curToken}
+
+	if !p.expectPeek(token.STRING) {
+		return nil
+	}
+
+	stmt.Path = &ast.StringLiteral{Token: p.curToken, Value: p.curToken.Literal}
+
+	if !p.expectPeek(token.IMPORT) {
+		return nil
+	}
+
+	stmt.Imports = []*ast.Identifier{}
+
+	if p.peekTokenIs(token.IDENT) {
+		p.nextToken()
+		stmt.Imports = append(stmt.Imports, &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal})
+
+		for p.peekTokenIs(token.COMMA) {
+			p.nextToken() // skip comma
+			p.nextToken() // move to ident
+			stmt.Imports = append(stmt.Imports, &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal})
+		}
+	}
+
+	if p.peekTokenIs(token.SEMICOLON) {
+		p.nextToken()
+	}
+
+	return stmt
+}
+
+func (p *Parser) parseImportStatement() *ast.ImportStatement {
+	stmt := &ast.ImportStatement{Token: p.curToken}
+
+	if !p.expectPeek(token.STRING) {
+		return nil
+	}
+
+	stmt.Path = &ast.StringLiteral{Token: p.curToken, Value: p.curToken.Literal}
+
+	if p.peekTokenIs(token.IDENT) {
+		// e.g. import "math" as math
+		p.nextToken() 
+		stmt.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	}
+
+	if p.peekTokenIs(token.SEMICOLON) {
+		p.nextToken()
+	}
+
+	return stmt
 }
 
 func (p *Parser) parseTryStatement() *ast.TryStatement {

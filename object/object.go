@@ -115,11 +115,10 @@ func (a *Array) Inspect() string {
 }
 
 type Channel struct {
-	Internal chan Object
+	Value chan Object
 }
-
 func (c *Channel) Type() ObjectType { return CHANNEL_OBJ }
-func (c *Channel) Inspect() string  { return "channel" }
+func (c *Channel) Inspect() string  { return fmt.Sprintf("channel(%p)", c.Value) }
 
 type BuiltinFn func(args ...Object) Object
 

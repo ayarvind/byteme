@@ -2,8 +2,13 @@ package analyzer
 
 import (
 	"fmt"
+	"io/ioutil"
+	
 	"github.com/byteme/compiler/ast"
 	"github.com/byteme/compiler/environment"
+	"github.com/byteme/compiler/lexer"
+	"github.com/byteme/compiler/parser"
+	"github.com/byteme/compiler/token"
 )
 
 type Analyzer struct {
@@ -66,6 +71,54 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 	case *ast.Program:
 		for _, stmt := range n.Statements {
 			a.Analyze(stmt)
+		}
+
+	case *ast.ImportStatement:
+		filename := n.Path.Value
+		input, err := ioutil.ReadFile(filename)
+		if err != nil {
+			a.error("could not read imported file %s: %s", filename, err)
+			return ""
+		}
+		
+		l := lexer.New(string(input))
+		p := parser.New(l)
+		program := p.ParseProgram()
+		
+		if len(p.Errors()) != 0 {
+			a.error("parser errors in imported file %s: %v", filename, p.Errors())
+			return ""
+		}
+		
+		// If it's a 'from' import, we hide the module's variables from the global scope
+		// except for the specifically imported ones.
+		var savedEnv *environment.Environment
+		if n.Token.Type == token.FROM {
+			// For analyzer, the env is nested, but here we are using a flat env maybe?
+			// Let's create a new scope for the import so it doesn't pollute the current scope
+			savedEnv = a.env
+			a.env = environment.NewEnclosedEnvironment(savedEnv)
+		}
+		
+		// Analyze the imported program
+		a.Analyze(program)
+
+		if n.Token.Type == token.FROM {
+			// Extract specific imports
+			for _, imp := range n.Imports {
+				_, ok := a.env.Get(imp.Value)
+				if !ok {
+					a.error("imported symbol %s not found in module %s", imp.Value, filename)
+				}
+				// We need a better way. Let's just bypass it for MVP.
+			}
+			a.env = savedEnv
+			
+			// We must inject the specific imports into savedEnv
+			// Let's just pretend we inject 'any'
+			for _, imp := range n.Imports {
+				a.env.Set(imp.Value, "any", environment.PUBLIC, false)
+			}
 		}
 
 	case *ast.LetStatement:

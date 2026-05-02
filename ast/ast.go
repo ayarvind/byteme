@@ -37,6 +37,32 @@ func (p *Program) String() string {
 
 // --- Statements ---
 
+type ImportStatement struct {
+	Token   token.Token // The 'import' or 'from' token
+	Path    *StringLiteral
+	Name    *Identifier   // Optional alias or name
+	Imports []*Identifier // e.g., from "path" import A, B
+}
+func (is *ImportStatement) statementNode()       {}
+func (is *ImportStatement) TokenLiteral() string { return is.Token.Literal }
+func (is *ImportStatement) String() string {
+	var out bytes.Buffer
+	if is.Token.Type == token.FROM {
+		out.WriteString("from " + is.Path.String() + " import ")
+		for i, imp := range is.Imports {
+			out.WriteString(imp.String())
+			if i < len(is.Imports)-1 { out.WriteString(", ") }
+		}
+	} else {
+		out.WriteString(is.TokenLiteral() + " " + is.Path.String())
+		if is.Name != nil {
+			out.WriteString(" as " + is.Name.String())
+		}
+	}
+	out.WriteString(";")
+	return out.String()
+}
+
 type LetStatement struct {
 	Token token.Token
 	Name  *Identifier

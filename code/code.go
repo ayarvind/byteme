@@ -34,6 +34,10 @@ const (
 	OpNull
 	OpGetLocal
 	OpSetLocal
+	OpArray
+	OpSpawn
+	OpSend
+	OpReceive
 )
 
 type Definition struct {
@@ -66,6 +70,10 @@ var definitions = map[Opcode]*Definition{
 	OpNull:          {"OpNull", []int{}},
 	OpGetLocal:      {"OpGetLocal", []int{1}},
 	OpSetLocal:      {"OpSetLocal", []int{1}},
+	OpArray:         {"OpArray", []int{2}}, // 2-byte number of elements
+	OpSpawn:         {"OpSpawn", []int{1}}, // 1-byte number of arguments
+	OpSend:          {"OpSend", []int{}},
+	OpReceive:       {"OpReceive", []int{}},
 }
 
 func Lookup(op byte) (*Definition, error) {

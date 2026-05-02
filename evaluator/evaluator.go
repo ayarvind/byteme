@@ -19,7 +19,7 @@ var (
 var builtins = map[string]*object.Builtin{
 	"chan": {
 		Fn: func(args ...object.Object) object.Object {
-			return &object.Channel{Internal: make(chan object.Object, 100)}
+			return &object.Channel{Value: make(chan object.Object, 100)}
 		},
 	},
 	"send": {
@@ -31,7 +31,7 @@ var builtins = map[string]*object.Builtin{
 			if !ok {
 				return NULL
 			}
-			ch.Internal <- args[1]
+			ch.Value <- args[1]
 			return NULL
 		},
 	},
@@ -44,7 +44,7 @@ var builtins = map[string]*object.Builtin{
 			if !ok {
 				return NULL
 			}
-			return <-ch.Internal
+			return <-ch.Value
 		},
 	},
 	"println": {

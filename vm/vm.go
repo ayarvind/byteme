@@ -158,6 +158,35 @@ func (vm *VM) Run() error {
 				}
 			}
 
+		case code.OpSpawn:
+			numArgs := int(ins[ip+1])
+			vm.currentFrame().ip += 1
+			
+			fn := vm.stack[vm.sp-1-numArgs]
+			if builtin, ok := fn.(*object.Builtin); ok {
+				args := make([]object.Object, numArgs)
+				copy(args, vm.stack[vm.sp-numArgs : vm.sp])
+				vm.sp = vm.sp - numArgs - 1
+				go func() {
+					builtin.Fn(args...)
+				}()
+				err := vm.push(object.NULL)
+				if err != nil { return err }
+			}
+
+		case code.OpArray:
+			numElements := int(binary.BigEndian.Uint16(ins[ip+1:]))
+			vm.currentFrame().ip += 2
+			
+			elements := make([]object.Object, numElements)
+			for i := 0; i < numElements; i++ {
+				elements[i] = vm.stack[vm.sp-numElements+i]
+			}
+			vm.sp = vm.sp - numElements
+			
+			err := vm.push(&object.Array{Elements: elements})
+			if err != nil { return err }
+
 		case code.OpNull:
 			err := vm.push(object.NULL)
 			if err != nil { return err }

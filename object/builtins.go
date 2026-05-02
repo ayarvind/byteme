@@ -122,6 +122,33 @@ var Builtins = []*Builtin{
 			return NULL
 		},
 	},
+	{ // 11: map
+		Fn: func(args ...Object) Object {
+			return &Map{Pairs: make(map[string]Object)}
+		},
+	},
+	{ // 12: chan
+		Fn: func(args ...Object) Object {
+			return &Channel{Value: make(chan Object)}
+		},
+	},
+	{ // 13: send
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 { return &Error{Message: "send requires 2 arguments"} }
+			ch, ok := args[0].(*Channel)
+			if !ok { return &Error{Message: "first argument to send must be a channel"} }
+			ch.Value <- args[1]
+			return NULL
+		},
+	},
+	{ // 14: recv
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return &Error{Message: "recv requires 1 argument"} }
+			ch, ok := args[0].(*Channel)
+			if !ok { return &Error{Message: "first argument to recv must be a channel"} }
+			return <-ch.Value
+		},
+	},
 }
 
 func ConvertToByteMeObject(val interface{}) Object {
