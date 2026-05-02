@@ -1,0 +1,26 @@
+fn partition(arr, low, high) {
+    let pivot = arr[high];
+    let idx = 0;
+    idx = low - 1;
+    let j = low;
+
+    while (j < high) {
+        if (arr[j] < pivot) {
+            idx = idx + 1;
+            let temp = arr[idx];
+            arr[idx] = arr[j];
+            arr[j] = temp;
+        }
+        j = j + 1;
+    }
+
+    let temp2 = arr[idx + 1];
+    arr[idx + 1] = arr[high];
+    arr[high] = temp2;
+
+    return idx + 1;
+}
+
+let myList = [3, 1, 2];
+partition(myList, 0, 2);
+myList;

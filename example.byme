@@ -1,0 +1,38 @@
+// ByteMe Example Program
+
+public namespace MathService {
+    public fn multiply(a: int, b: int) -> int {
+        return a * b;
+    }
+}
+
+async fn asyncTask(x: int) -> int {
+    let base: int = 10;
+    return MathService.multiply(x, base);
+}
+
+// 1. Basic Math & Namespace call
+let val: int = MathService.multiply(5, 5);
+
+// 2. Async/Await Concurrency
+let asyncResult: int = await asyncTask(val);
+
+// 3. Array Creation
+let arr: [int] = [1, 2, 3, 4, 5];
+
+// 4. Array Access
+let first: int = arr[0];
+let third: int = arr[2];
+
+// 5. Array Element Assignment
+arr[1] = 20;
+
+// 6. Return an array
+fn createArray() -> [int] {
+    return [10, 20, 30];
+}
+
+let newArr: [int] = createArray();
+
+// 7. Final Expression (will be printed by main.go)
+newArr;

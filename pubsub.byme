@@ -1,0 +1,53 @@
+// Thread-Safe Pub/Sub Architecture in ByteMe
+
+public namespace MessageBroker {
+    let bus: channel = chan();
+
+    public fn publish(msg: string) {
+        println("Broker: Received message for routing ->", msg);
+        send(bus, msg);
+        return 0;
+    }
+
+    public fn subscribe() -> string {
+        return recv(bus);
+    }
+}
+
+fn producer(count: int) {
+    let i = 1;
+    while (i <= count) {
+        let data = "MSG_" + "ID_"; // Logic test
+        println("Producer: Dispatching", data, i);
+        MessageBroker.publish(data);
+        i = i + 1;
+    }
+    return 0;
+}
+
+fn consumer(id: int) {
+    println("Consumer", id, "started listening on thread-safe channel...");
+    while (true) {
+        let msg = MessageBroker.subscribe();
+        println("Consumer", id, "successfully processed:", msg);
+    }
+    return 0;
+}
+
+// --- Concurrent System Initialization ---
+
+println("Starting Pub/Sub System...");
+
+// 1. Spawn a dedicated consumer task
+spawn consumer(1);
+
+// 2. Spawn a producer task
+spawn producer(3);
+
+// 3. Keep main task alive to witness the background communication
+let timeout = 0;
+while (timeout < 5000) {
+    timeout = timeout + 1;
+}
+
+println("Main: Task finished. Shutting down system.");

@@ -1,0 +1,75 @@
+// Stack and Queue Implementations in ByteMe (Renamed Built-ins)
+
+public namespace Stack {
+    let items = [];
+
+    public fn push(val: any) {
+        arrayPush(items, val);
+        return 0;
+    }
+
+    public fn pop() -> any {
+        return arrayPop(items);
+    }
+
+    public fn peek() -> any {
+        let count = arrayLen(items);
+        if (count > 0) {
+            return items[count - 1];
+        }
+        return null;
+    }
+
+    public fn size() -> int {
+        return arrayLen(items);
+    }
+}
+
+public namespace Queue {
+    let items = [];
+
+    public fn enqueue(val: any) {
+        arrayPush(items, val);
+        return 0;
+    }
+
+    public fn dequeue() -> any {
+        return arrayShift(items);
+    }
+
+    public fn peek() -> any {
+        let count = arrayLen(items);
+        if (count > 0) {
+            return items[0];
+        }
+        return null;
+    }
+
+    public fn size() -> int {
+        return arrayLen(items);
+    }
+}
+
+// --- Testing Operations ---
+
+println("--- Testing Stack (LIFO) ---");
+Stack.push(10);
+Stack.push(20);
+Stack.push(30);
+
+println("Stack Top:", Stack.peek());
+println("Popped:", Stack.pop());
+println("New Top:", Stack.peek());
+println("Current Size:", Stack.size());
+
+println("");
+
+println("--- Testing Queue (FIFO) ---");
+Queue.enqueue("UserA");
+Queue.enqueue("UserB");
+Queue.enqueue("UserC");
+
+println("Queue Front:", Queue.peek());
+println("Dequeued:", Queue.dequeue());
+println("New Front:", Queue.peek());
+println("Current Size:", Queue.size());

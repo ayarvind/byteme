@@ -1,0 +1,7 @@
+let arr = [3, 1, 2];
+let i = 0;
+while (i < 3) {
+    arr[i] = arr[i] + 10;
+    i = i + 1;
+}
+arr;

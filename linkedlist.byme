@@ -1,0 +1,79 @@
+// Linked List Implementation in ByteMe
+
+struct Node {
+    data: int,
+    next: any
+}
+
+public namespace LinkedList {
+    let head = null;
+
+    public fn append(val: int) {
+        let newNode = Node(val, null);
+        if (head == null) {
+            head = newNode;
+        } else {
+            let curr = head;
+            while (curr.next != null) {
+                curr = curr.next;
+            }
+            curr.next = newNode;
+        }
+        return 0;
+    }
+
+    public fn prepend(val: int) {
+        let newNode = Node(val, head);
+        head = newNode;
+        return 0;
+    }
+
+    public fn delete(val: int) {
+        if (head == null) { return 0; }
+        if (head.data == val) {
+            head = head.next;
+            return 0;
+        }
+        let curr = head;
+        while (curr.next != null) {
+            if (curr.next.data == val) {
+                curr.next = curr.next.next;
+                return 0;
+            }
+            curr = curr.next;
+        }
+        return 0;
+    }
+
+    public fn printList() {
+        let curr = head;
+        println("List Data:");
+        while (curr != null) {
+            println("->", curr.data);
+            curr = curr.next;
+        }
+        return 0;
+    }
+}
+
+// --- Execution ---
+
+println("Adding 10, 20, 30...");
+LinkedList.append(10);
+LinkedList.append(20);
+LinkedList.append(30);
+
+println("Prepending 5...");
+LinkedList.prepend(5);
+
+LinkedList.printList();
+
+println("Deleting 20...");
+LinkedList.delete(20);
+
+LinkedList.printList();
+
+println("Deleting head (5)...");
+LinkedList.delete(5);
+
+LinkedList.printList();

@@ -1,0 +1,4 @@
+let c = chan();
+send(c, "hello");
+let x = recv(c);
+println(x);

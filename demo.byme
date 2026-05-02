@@ -1,0 +1,26 @@
+// Advanced ByteMe Demo
+
+struct Point {
+    x: int,
+    y: int
+}
+
+fn worker(id: int) -> int {
+    return id * 2;
+}
+
+// Spawn a background thread (result is ignored as per ByteMe spec)
+spawn worker(100);
+
+let start: int = 10;
+let end: int = 20;
+
+fn calculate(a: int, b: int) -> int {
+    if (a > b) {
+        return a;
+    } else {
+        return b;
+    }
+}
+
+calculate(start, end);

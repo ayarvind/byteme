@@ -1,0 +1,161 @@
+package object
+
+import (
+	"bytes"
+	"fmt"
+	"github.com/byteme/compiler/ast"
+	"github.com/byteme/compiler/environment"
+)
+
+type ObjectType string
+
+const (
+	INTEGER_OBJ      = "INTEGER"
+	FLOAT_OBJ        = "FLOAT"
+	BOOLEAN_OBJ      = "BOOLEAN"
+	STRING_OBJ       = "STRING"
+	NULL_OBJ         = "NULL"
+	RETURN_VALUE_OBJ = "RETURN_VALUE"
+	FUNCTION_OBJ     = "FUNCTION"
+	FUTURE_OBJ       = "FUTURE"
+	NAMESPACE_OBJ    = "NAMESPACE"
+	ARRAY_OBJ        = "array"
+	CHANNEL_OBJ      = "channel"
+	BUILTIN_OBJ      = "builtin"
+	STRUCT_LITERAL_OBJ = "STRUCT_LITERAL"
+	STRUCT_OBJ         = "STRUCT_INSTANCE"
+	MAP_OBJ            = "map"
+)
+
+type Object interface {
+	Type() ObjectType
+	Inspect() string
+}
+
+type Integer struct{ Value int64 }
+func (i *Integer) Type() ObjectType { return INTEGER_OBJ }
+func (i *Integer) Inspect() string  { return fmt.Sprintf("%d", i.Value) }
+
+type Float struct{ Value float64 }
+func (f *Float) Type() ObjectType { return FLOAT_OBJ }
+func (f *Float) Inspect() string  { return fmt.Sprintf("%g", f.Value) }
+
+type Boolean struct{ Value bool }
+func (b *Boolean) Type() ObjectType { return BOOLEAN_OBJ }
+func (b *Boolean) Inspect() string  { return fmt.Sprintf("%t", b.Value) }
+
+type String struct{ Value string }
+func (s *String) Type() ObjectType { return STRING_OBJ }
+func (s *String) Inspect() string  { return s.Value }
+
+type Null struct{}
+func (n *Null) Type() ObjectType { return NULL_OBJ }
+func (n *Null) Inspect() string  { return "null" }
+
+type ReturnValue struct{ Value Object }
+func (rv *ReturnValue) Type() ObjectType { return RETURN_VALUE_OBJ }
+func (rv *ReturnValue) Inspect() string  { return rv.Value.Inspect() }
+
+type Function struct {
+	Parameters []*ast.Parameter
+	Body       *ast.BlockStatement
+	Env        *environment.Environment
+	IsAsync    bool
+}
+func (f *Function) Type() ObjectType { return FUNCTION_OBJ }
+func (f *Function) Inspect() string  { return "fn" }
+
+// Future represents a value that will be available later (for async/await)
+type Future struct {
+	ValueChan chan Object
+	result    Object
+	resolved  bool
+}
+func (f *Future) Type() ObjectType { return FUTURE_OBJ }
+func (f *Future) Inspect() string  { return "future" }
+func (f *Future) Get() Object {
+	if f.resolved {
+		return f.result
+	}
+	f.result = <-f.ValueChan
+	f.resolved = true
+	return f.result
+}
+
+type Namespace struct {
+	Name string
+	Env  *environment.Environment
+}
+func (ns *Namespace) Type() ObjectType { return NAMESPACE_OBJ }
+func (ns *Namespace) Inspect() string  { return fmt.Sprintf("namespace %s", ns.Name) }
+
+type Array struct {
+	Elements []Object
+}
+
+func (a *Array) Type() ObjectType { return ARRAY_OBJ }
+func (a *Array) Inspect() string {
+	var out bytes.Buffer
+	out.WriteString("[")
+	for i, e := range a.Elements {
+		out.WriteString(e.Inspect())
+		if i < len(a.Elements)-1 {
+			out.WriteString(", ")
+		}
+	}
+	out.WriteString("]")
+	return out.String()
+}
+
+type Channel struct {
+	Internal chan Object
+}
+
+func (c *Channel) Type() ObjectType { return CHANNEL_OBJ }
+func (c *Channel) Inspect() string  { return "channel" }
+
+type BuiltinFn func(args ...Object) Object
+
+type Builtin struct {
+	Fn BuiltinFn
+}
+
+func (b *Builtin) Type() ObjectType { return BUILTIN_OBJ }
+func (b *Builtin) Inspect() string  { return "builtin function" }
+
+type StructLiteral struct {
+	Name   string
+	Fields []*ast.Parameter
+}
+func (s *StructLiteral) Type() ObjectType { return STRUCT_LITERAL_OBJ }
+func (s *StructLiteral) Inspect() string  { return fmt.Sprintf("struct %s", s.Name) }
+
+type StructInstance struct {
+	Definition *StructLiteral
+	Fields     map[string]Object
+}
+func (s *StructInstance) Type() ObjectType { return STRUCT_OBJ }
+func (s *StructInstance) Inspect() string {
+	var out bytes.Buffer
+	out.WriteString(s.Definition.Name)
+	out.WriteString("{")
+	for k, v := range s.Fields {
+		out.WriteString(fmt.Sprintf("%s: %s, ", k, v.Inspect()))
+	}
+	out.WriteString("}")
+	return out.String()
+}
+
+type Map struct {
+	Pairs map[string]Object
+}
+func (m *Map) Type() ObjectType { return MAP_OBJ }
+func (m *Map) Inspect() string {
+	var out bytes.Buffer
+	out.WriteString("{")
+	for k, v := range m.Pairs {
+		out.WriteString(fmt.Sprintf("%s: %s, ", k, v.Inspect()))
+	}
+	out.WriteString("}")
+	return out.String()
+}

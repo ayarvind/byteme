@@ -1,0 +1,85 @@
+// Trie (Prefix Tree) Implementation in ByteMe
+
+struct TrieNode {
+    children: any,
+    isEndOfWord: bool
+}
+
+public namespace Trie {
+    // Root node with an empty map for children
+    let root = TrieNode(map(), false);
+
+    public fn insert(word: string) {
+        let curr = root;
+        let i = 0;
+        let n = arrayLen(word);
+
+        while (i < n) {
+            let char = charAt(word, i);
+            // Check if character already exists in children
+            if (!mapHas(curr.children, char)) {
+                mapSet(curr.children, char, TrieNode(map(), false));
+            }
+            // Move to the next node
+            curr = mapGet(curr.children, char);
+            i = i + 1;
+        }
+        curr.isEndOfWord = true;
+        println("Inserted:", word);
+        return 0;
+    }
+
+    public fn search(word: string) -> bool {
+        let curr = root;
+        let i = 0;
+        let n = arrayLen(word);
+
+        while (i < n) {
+            let char = charAt(word, i);
+            if (!mapHas(curr.children, char)) {
+                return false;
+            }
+            curr = mapGet(curr.children, char);
+            i = i + 1;
+        }
+        return curr.isEndOfWord;
+    }
+
+    public fn startsWith(prefix: string) -> bool {
+        let curr = root;
+        let i = 0;
+        let n = arrayLen(prefix);
+
+        while (i < n) {
+            let char = charAt(prefix, i);
+            if (!mapHas(curr.children, char)) {
+                return false;
+            }
+            curr = mapGet(curr.children, char);
+            i = i + 1;
+        }
+        return true;
+    }
+}
+
+// --- Test Suite ---
+
+println("--- Trie Demonstration ---");
+
+Trie.insert("apple");
+Trie.insert("apply");
+Trie.insert("ball");
+
+println("Search 'apple':", Trie.search("apple"));   // true
+println("Search 'apply':", Trie.search("apply"));   // true
+println("Search 'app':", Trie.search("app"));       // false
+println("Search 'ball':", Trie.search("ball"));     // true
+println("Search 'bat':", Trie.search("bat"));       // false
+
+println("StartsWith 'app':", Trie.startsWith("app")); // true
+println("StartsWith 'ba':", Trie.startsWith("ba"));   // true
+println("StartsWith 'ca':", Trie.startsWith("ca"));   // false
+
+println("Inserting 'app'...");
+Trie.insert("app");
+println("Search 'app' now:", Trie.search("app"));     // true
