@@ -1,0 +1,28 @@
+// Testing File Handling in ByteMe
+
+let path = "test_output.txt";
+let message = "Hello from ByteMe Language!\n";
+
+println("--- Writing to File ---");
+fileWrite(path, message);
+println("File written successfully.");
+
+println("\n--- Checking File Existence ---");
+if (fileExists(path)) {
+    println("File exists:", path);
+}
+
+println("\n--- Appending to File ---");
+fileAppend(path, "Adding a second line.\n");
+println("Appended content.");
+
+println("\n--- Reading from File ---");
+let content = fileRead(path);
+println("File Content:\n", content);
+
+println("\n--- Error Handling Test ---");
+try {
+    let dummy = fileRead("non_existent_file.txt");
+} catch(e) {
+    println("Caught error as expected:", e);
+}

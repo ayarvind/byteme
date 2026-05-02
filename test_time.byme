@@ -1,0 +1,21 @@
+// Testing Time and Date Module in ByteMe
+
+println("--- Current Time ---");
+let now = timeNow();
+println("Current Unix Ms:", now);
+
+let formatted = timeFormat(now, "2006-01-02 15:04:05");
+println("Formatted Time:", formatted);
+
+println("\n--- Testing Sleep (1 second) ---");
+let start = timeNow();
+timeSleep(1000);
+let end = timeNow();
+
+println("Woke up!");
+println("Actual sleep duration (ms):", end - start);
+
+println("\n--- Complex Date Math ---");
+let oneDayMs = 24 * 60 * 60 * 1000;
+let tomorrow = now + oneDayMs;
+println("Tomorrow's Date:", timeFormat(tomorrow, "Monday, Jan 2, 2006"));

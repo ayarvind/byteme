@@ -111,6 +111,8 @@ func (l *Lexer) NextToken() token.Token {
 		tok = newToken(token.RBRACKET, l.ch)
 	case '.':
 		tok = newToken(token.DOT, l.ch)
+	case '@':
+		tok = newToken(token.AT, l.ch)
 	case '"':
 		tok.Type = token.STRING
 		tok.Literal = l.readString()
@@ -168,14 +170,25 @@ func (l *Lexer) readNumber() (string, token.TokenType) {
 }
 
 func (l *Lexer) readString() string {
-	position := l.position + 1
-	for {
-		l.readChar()
-		if l.ch == '"' || l.ch == 0 {
-			break
+	var out []rune
+	l.readChar() // skip opening quote
+	
+	for l.ch != '"' && l.ch != 0 {
+		if l.ch == '\\' {
+			l.readChar()
+			switch l.ch {
+			case 'n': out = append(out, '\n')
+			case 't': out = append(out, '\t')
+			case '"': out = append(out, '"')
+			case '\\': out = append(out, '\\')
+			default: out = append(out, rune(l.ch))
+			}
+		} else {
+			out = append(out, rune(l.ch))
 		}
+		l.readChar()
 	}
-	return l.input[position:l.position]
+	return string(out)
 }
 
 func isLetter(ch byte) bool {
@@ -188,4 +201,17 @@ func isDigit(ch byte) bool {
 
 func newToken(tokenType token.TokenType, ch byte) token.Token {
 	return token.Token{Type: tokenType, Literal: string(ch)}
+}
+
+func (l *Lexer) GetRemainingInput() string {
+	return l.input[l.position:]
+}
+
+func (l *Lexer) Clone() *Lexer {
+	return &Lexer{
+		input:        l.input,
+		position:     l.position,
+		readPosition: l.readPosition,
+		ch:           l.ch,
+	}
 }

@@ -101,6 +101,37 @@ func (rs *ReturnStatement) String() string {
 	return out.String()
 }
 
+type ThrowStatement struct {
+	Token token.Token // the 'throw' token
+	Value Expression
+}
+func (ts *ThrowStatement) statementNode()       {}
+func (ts *ThrowStatement) TokenLiteral() string { return ts.Token.Literal }
+func (ts *ThrowStatement) String() string {
+	return "throw " + ts.Value.String() + ";"
+}
+
+type TryStatement struct {
+	Token      token.Token // the 'try' token
+	Body       *BlockStatement
+	CatchVar   *Identifier // e.g. 'e' in catch(e)
+	CatchBody  *BlockStatement
+	Finally    *BlockStatement
+}
+func (ts *TryStatement) statementNode()       {}
+func (ts *TryStatement) TokenLiteral() string { return ts.Token.Literal }
+func (ts *TryStatement) String() string {
+	var out bytes.Buffer
+	out.WriteString("try " + ts.Body.String())
+	if ts.CatchBody != nil {
+		out.WriteString(" catch(" + ts.CatchVar.String() + ") " + ts.CatchBody.String())
+	}
+	if ts.Finally != nil {
+		out.WriteString(" finally " + ts.Finally.String())
+	}
+	return out.String()
+}
+
 type ExpressionStatement struct {
 	Token      token.Token
 	Expression Expression
@@ -235,12 +266,13 @@ func (ie *IfExpression) String() string {
 }
 
 type FunctionLiteral struct {
-	Token      token.Token
-	Name       *Identifier
-	Parameters []*Parameter
-	Body       *BlockStatement
-	ReturnType string
-	IsAsync    bool
+	Token          token.Token
+	Name           *Identifier
+	Parameters     []*Parameter
+	Body           *BlockStatement
+	ReturnType     string
+	IsAsync        bool
+	TypeParameters []*Identifier
 }
 type Parameter struct {
 	Name *Identifier
@@ -258,9 +290,10 @@ func (fl *FunctionLiteral) String() string {
 }
 
 type CallExpression struct {
-	Token     token.Token
-	Function  Expression
-	Arguments []Expression
+	Token         token.Token
+	Function      Expression
+	Arguments     []Expression
+	TypeArguments []string
 }
 func (ce *CallExpression) expressionNode()      {}
 func (ce *CallExpression) TokenLiteral() string { return ce.Token.Literal }
@@ -298,10 +331,34 @@ func (nl *NamespaceLiteral) String() string {
 }
 
 type StructLiteral struct {
-	Token  token.Token
-	Name   *Identifier
-	Fields []*Parameter
+	Token          token.Token
+	Name           *Identifier
+	Fields         []*Parameter
+	TypeParameters []*Identifier
 }
 func (sl *StructLiteral) expressionNode()      {}
 func (sl *StructLiteral) TokenLiteral() string { return sl.Token.Literal }
 func (sl *StructLiteral) String() string       { return "struct " + sl.Name.String() }
+
+type InterfaceStatement struct {
+	Token   token.Token // 'interface'
+	Name    *Identifier
+	Methods []*MethodSignature
+}
+type MethodSignature struct {
+	Name       *Identifier
+	Parameters []*Parameter
+	ReturnType string
+}
+func (is *InterfaceStatement) statementNode()       {}
+func (is *InterfaceStatement) TokenLiteral() string { return is.Token.Literal }
+func (is *InterfaceStatement) String() string       { return "interface " + is.Name.String() }
+
+type EnumStatement struct {
+	Token   token.Token // 'enum'
+	Name    *Identifier
+	Members []*Identifier
+}
+func (es *EnumStatement) statementNode()       {}
+func (es *EnumStatement) TokenLiteral() string { return es.Token.Literal }
+func (es *EnumStatement) String() string       { return "enum " + es.Name.String() }

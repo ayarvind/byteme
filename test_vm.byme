@@ -1,0 +1,8 @@
+// Testing Bytecode VM in ByteMe
+// Basic arithmetic and comparison
+
+(10 + 20) * 3 / 2;
+100 > 50;
+!true;
+-42;
+5 + 5 == 10;

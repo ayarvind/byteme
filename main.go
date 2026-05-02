@@ -1,26 +1,45 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"os"
 
 	"github.com/byteme/compiler/analyzer"
 	"github.com/byteme/compiler/ast"
+	"github.com/byteme/compiler/compiler"
 	"github.com/byteme/compiler/environment"
 	"github.com/byteme/compiler/evaluator"
 	"github.com/byteme/compiler/lexer"
 	"github.com/byteme/compiler/optimizer"
 	"github.com/byteme/compiler/parser"
+	"github.com/byteme/compiler/object"
+	"github.com/byteme/compiler/repl"
+	"github.com/byteme/compiler/vm"
 )
 
+func init() {
+	// Register a native Go function
+	evaluator.RegisterNative("goGreet", func(args ...object.Object) object.Object {
+		if len(args) != 1 { return object.NULL }
+		name := args[0].Inspect()
+		return &object.String{Value: fmt.Sprintf("Hello %s, I am a Go function!", name)}
+	})
+}
+
 func main() {
-	if len(os.Args) < 2 {
-		fmt.Println("Usage: byteme <filename.byme>")
-		os.Exit(1)
+	compileOnly := flag.Bool("c", false, "compile only, do not run")
+	useEvaluator := flag.Bool("eval", false, "use the tree-walk evaluator instead of VM")
+	flag.Parse()
+
+	if len(flag.Args()) < 1 {
+		fmt.Println("ByteMe Language Shell v1.0")
+		repl.Start(os.Stdin, os.Stdout)
+		return
 	}
 
-	filename := os.Args[1]
+	filename := flag.Args()[0]
 	input, err := ioutil.ReadFile(filename)
 	if err != nil {
 		fmt.Printf("Error reading file: %s\n", err)
@@ -51,10 +70,41 @@ func main() {
 	opt := optimizer.New()
 	optimized := opt.Optimize(program).(*ast.Program)
 
-	// 5. Evaluation
-	result := evaluator.Eval(optimized, env)
-	if result != nil {
-		fmt.Println(result.Inspect())
+	if *compileOnly {
+		comp := compiler.New()
+		err := comp.Compile(optimized)
+		if err != nil {
+			fmt.Printf("Compilation Error: %s\n", err)
+			os.Exit(1)
+		}
+		fmt.Println("Compilation successful.")
+		return
+	}
+
+	if *useEvaluator {
+		result := evaluator.Eval(optimized, env)
+		if result != nil && result != object.NULL {
+			fmt.Println(result.Inspect())
+		}
+	} else {
+		comp := compiler.New()
+		err := comp.Compile(optimized)
+		if err != nil {
+			fmt.Printf("Compiler Error: %s\n", err)
+			return
+		}
+
+		machine := vm.New(comp.Bytecode())
+		err = machine.Run()
+		if err != nil {
+			fmt.Printf("VM Error: %s\n", err)
+			return
+		}
+
+		lastStackElem := machine.LastPoppedStackElem()
+		if lastStackElem != nil && lastStackElem != object.NULL {
+			fmt.Println(lastStackElem.Inspect())
+		}
 	}
 }
 

@@ -1,0 +1,20 @@
+// Testing Generics in ByteMe
+
+struct Box<T> {
+    content: T
+}
+
+fn identity<T>(val: T) -> T {
+    return val;
+}
+
+println("--- Generic Structs ---");
+let intBox = Box(500);
+println("Box content:", intBox.content);
+
+println("\n--- Generic Functions ---");
+let num = identity@int(42);
+println("Identity@int:", num);
+
+let msg = identity@string("ByteMe");
+println("Identity@string:", msg);

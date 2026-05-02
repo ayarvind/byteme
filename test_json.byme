@@ -1,0 +1,27 @@
+// Testing JSON Support in ByteMe
+
+let data = map();
+mapSet(data, "name", "ByteMe");
+mapSet(data, "version", 2);
+mapSet(data, "features", ["Generics", "Concurrency", "JSON"]);
+
+println("--- Original Map ---");
+println(data);
+
+println("\n--- Stringifying to JSON ---");
+let jsonStr = jsonStringify(data);
+println("JSON String:", jsonStr);
+
+println("\n--- Parsing JSON back ---");
+let parsed = jsonParse(jsonStr);
+println("Parsed Object:", parsed);
+println("Access Name:", mapGet(parsed, "name"));
+println("Access Version:", mapGet(parsed, "version"));
+
+println("\n--- Complex Nested JSON ---");
+let nestedStr = "{\"user\":{\"id\":101,\"profile\":{\"role\":\"admin\"}},\"tags\":[\"dev\",\"compiler\"]}";
+let nested = jsonParse(nestedStr);
+println("Nested Object:", nested);
+let user = mapGet(nested, "user");
+let profile = mapGet(user, "profile");
+println("User Role:", mapGet(profile, "role"));

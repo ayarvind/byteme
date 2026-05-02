@@ -1,0 +1,14 @@
+// Testing Native Interop in ByteMe
+
+let name = "ByteMe User";
+
+println("--- Calling Go Function ---");
+let result = nativeCall("goGreet", name);
+println("Go Response:", result);
+
+println("\n--- Testing Error Case ---");
+try {
+    nativeCall("nonExistent", 1, 2, 3);
+} catch(e) {
+    println("Caught error:", e);
+}

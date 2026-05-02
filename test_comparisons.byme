@@ -1,0 +1,21 @@
+// ByteMe Comparison Rules Test
+
+println("--- String Comparison ---");
+println("apple < banana:", "apple" < "banana");
+println("hello == hello:", "hello" == "hello");
+
+println("\n--- Reference Equality (Arrays) ---");
+let a = [1, 2];
+let b = [1, 2];
+let c = a;
+println("a == b (different arrays with same data):", a == b);
+println("a == c (same array reference):", a == c);
+
+println("\n--- Null Handling ---");
+let data = null;
+if (data == null) {
+    println("data is indeed null");
+}
+
+let res = "result: " + data; // Null to String conversion (Inspect)
+println(res);

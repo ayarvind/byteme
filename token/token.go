@@ -40,6 +40,7 @@ const (
 	RBRACKET  TokenType = "]"
 	ARROW     TokenType = "->"
 	DOT       TokenType = "."
+	AT        TokenType = "@"
 
 	// Keywords
 	FUNCTION  TokenType = "FUNCTION"
@@ -59,6 +60,13 @@ const (
 	SPAWN     TokenType = "SPAWN"
 	STRUCT    TokenType = "STRUCT"
 	WHILE     TokenType = "WHILE"
+	TRY       TokenType = "TRY"
+	CATCH     TokenType = "CATCH"
+	FINALLY   TokenType = "FINALLY"
+	THROW     TokenType = "THROW"
+	INTERFACE TokenType = "INTERFACE"
+	IMPLEMENTS TokenType = "IMPLEMENTS"
+	ENUM      TokenType = "ENUM"
 )
 
 type Token struct {
@@ -84,6 +92,14 @@ var keywords = map[string]TokenType{
 	"spawn":     SPAWN,
 	"struct":    STRUCT,
 	"while":     WHILE,
+	"try":       TRY,
+	"catch":     CATCH,
+	"finally":   FINALLY,
+	"throw":     THROW,
+	"interface": INTERFACE,
+	"implements": IMPLEMENTS,
+	"enum":      ENUM,
+	"@":         AT,
 }
 
 func LookupIdent(ident string) TokenType {

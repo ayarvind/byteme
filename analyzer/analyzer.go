@@ -27,6 +27,25 @@ func New(env *environment.Environment) *Analyzer {
 	env.Set("mapGet", "function", environment.PUBLIC, true)
 	env.Set("mapHas", "function", environment.PUBLIC, true)
 	env.Set("charAt", "function", environment.PUBLIC, true)
+	env.Set("fileRead", "function", environment.PUBLIC, true)
+	env.Set("fileWrite", "function", environment.PUBLIC, true)
+	env.Set("fileAppend", "function", environment.PUBLIC, true)
+	env.Set("fileExists", "function", environment.PUBLIC, true)
+	env.Set("jsonParse", "function", environment.PUBLIC, true)
+	env.Set("jsonStringify", "function", environment.PUBLIC, true)
+	env.Set("timeNow", "function", environment.PUBLIC, true)
+	env.Set("timeSleep", "function", environment.PUBLIC, true)
+	env.Set("timeFormat", "function", environment.PUBLIC, true)
+	env.Set("nativeCall", "function", environment.PUBLIC, true)
+	
+	// Register basic types as symbols
+	env.Set("int", "type", environment.PUBLIC, true)
+	env.Set("float", "type", environment.PUBLIC, true)
+	env.Set("string", "type", environment.PUBLIC, true)
+	env.Set("bool", "type", environment.PUBLIC, true)
+	env.Set("any", "type", environment.PUBLIC, true)
+	env.Set("array", "type", environment.PUBLIC, true)
+	env.Set("map", "type", environment.PUBLIC, true)
 
 	return &Analyzer{
 		env:    env,
@@ -172,6 +191,11 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 		}
 		// Check return type and parameters
 		funcEnv := environment.NewEnclosedEnvironment(a.env)
+		
+		for _, tp := range n.TypeParameters {
+			funcEnv.Set(tp.Value, "type", environment.PUBLIC, true)
+		}
+
 		for _, p := range n.Parameters {
 			funcEnv.Set(p.Name.Value, p.Type, environment.PUBLIC, false)
 		}
@@ -211,6 +235,7 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 
 	case *ast.StructLiteral:
 		a.env.Set(n.Name.Value, "type", environment.PUBLIC, true)
+		// We could analyze fields here if we want to check type parameter usage
 		return "type"
 
 	case *ast.CallExpression:
@@ -226,6 +251,34 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 
 	case *ast.AwaitExpression:
 		return a.Analyze(n.Expression)
+
+	case *ast.ThrowStatement:
+		a.Analyze(n.Value)
+		return "any"
+
+	case *ast.TryStatement:
+		a.Analyze(n.Body)
+		if n.CatchBody != nil {
+			catchEnv := environment.NewEnclosedEnvironment(a.env)
+			catchEnv.Set(n.CatchVar.Value, "any", environment.PUBLIC, false)
+			
+			oldEnv := a.env
+			a.env = catchEnv
+			a.Analyze(n.CatchBody)
+			a.env = oldEnv
+		}
+		if n.Finally != nil {
+			a.Analyze(n.Finally)
+		}
+		return "any"
+
+	case *ast.InterfaceStatement:
+		a.env.Set(n.Name.Value, "interface", environment.PUBLIC, true)
+		return "interface"
+
+	case *ast.EnumStatement:
+		a.env.Set(n.Name.Value, "namespace", environment.PUBLIC, true)
+		return "namespace"
 	}
 
 	return "any"
@@ -242,6 +295,10 @@ func (a *Analyzer) preScan(stmt ast.Statement) {
 		case *ast.StructLiteral:
 			a.env.Set(expr.Name.Value, "type", environment.PUBLIC, true)
 		}
+	case *ast.InterfaceStatement:
+		a.env.Set(s.Name.Value, "interface", environment.PUBLIC, true)
+	case *ast.EnumStatement:
+		a.env.Set(s.Name.Value, "namespace", environment.PUBLIC, true)
 	case *ast.LetStatement:
 		// We don't pre-scan variables to avoid uninitialized usage
 	}

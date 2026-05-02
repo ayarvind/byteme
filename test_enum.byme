@@ -1,0 +1,23 @@
+// Testing Enums in ByteMe
+
+enum Status {
+    Pending,
+    Active,
+    Closed
+}
+
+let currentStatus = Status.Pending;
+println("Status Pending:", currentStatus);
+
+if (currentStatus == Status.Pending) {
+    println("Task is pending...");
+}
+
+currentStatus = Status.Active;
+println("Status Active:", currentStatus);
+
+if (currentStatus == Status.Active) {
+    println("Task is now active!");
+}
+
+println("Status Closed Value:", Status.Closed);

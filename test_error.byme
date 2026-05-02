@@ -1,0 +1,42 @@
+// Testing Error Handling in ByteMe
+
+fn riskyOperation(fail: bool) {
+    if (fail) {
+        throw "Something went wrong!";
+    }
+    println("Operation successful!");
+    return 100;
+}
+
+println("--- Test 1: Successful Try ---");
+try {
+    let result = riskyOperation(false);
+    println("Result:", result);
+} catch(e:error) {
+    println("Caught error:", e);
+} finally {
+    println("Finally 1 executed");
+}
+
+println("\n--- Test 2: Caught Error ---");
+try {
+    let result = riskyOperation(true);
+    println("This should not print");
+} catch(e:error) {
+    println("Caught expected error:", e);
+} finally {
+    println("Finally 2 executed");
+}
+
+println("\n--- Test 3: Uncaught Error (Propagated) ---");
+fn caller() {
+    println("Calling risky...");
+    riskyOperation(true);
+    println("This should not print either");
+}
+
+try {
+    caller();
+} catch(err) {
+    println("Caught in outer scope:", err);
+}

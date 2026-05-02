@@ -1,0 +1,35 @@
+// ByteMe Ultimate Feature Test
+
+struct Response<T> {
+    data: T,
+    timestamp: int
+}
+
+fn fetchData<T>(id: int) -> Response<T> {
+    println("Fetching data for ID:", id);
+    timeSleep(500); // Simulate network delay
+    
+    if (id < 0) {
+        throw "Invalid ID: Must be positive";
+    }
+    
+    let rawJson = "{\"status\":\"success\",\"payload\":\"ByteMe is Awesome\"}";
+    let parsed = jsonParse(rawJson);
+    
+    return Response(mapGet(parsed, "payload"), timeNow());
+}
+
+println("--- Starting Ultimate Test ---");
+
+try {
+    let res = fetchData<string>(101);
+    println("Data Received:", res.data);
+    println("Time:", timeFormat(res.timestamp, "15:04:05"));
+    
+    println("\nTesting Error Handling...");
+    fetchData<string>(-1);
+} catch(e) {
+    println("Gracefully caught expected error:", e);
+} finally {
+    println("\nTest Suite Completed.");
+}

@@ -1,0 +1,10 @@
+// Testing Boolean Comparison (false=0, true=1)
+
+println("false < true:", false < true);
+println("true > false:", true > false);
+println("true == true:", true == true);
+println("false >= true:", false >= true);
+
+if (false < true) {
+    println("Logic Check: false is indeed less than true");
+}

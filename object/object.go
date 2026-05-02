@@ -7,6 +7,12 @@ import (
 	"github.com/byteme/compiler/environment"
 )
 
+var (
+	NULL  = &Null{}
+	TRUE  = &Boolean{Value: true}
+	FALSE = &Boolean{Value: false}
+)
+
 type ObjectType string
 
 const (
@@ -25,6 +31,7 @@ const (
 	STRUCT_LITERAL_OBJ = "STRUCT_LITERAL"
 	STRUCT_OBJ         = "STRUCT_INSTANCE"
 	MAP_OBJ            = "map"
+	ERROR_OBJ          = "ERROR"
 )
 
 type Object interface {
@@ -159,3 +166,10 @@ func (m *Map) Inspect() string {
 	out.WriteString("}")
 	return out.String()
 }
+
+type Error struct {
+	Message string
+}
+func (e *Error) Type() ObjectType { return ERROR_OBJ }
+func (e *Error) Inspect() string  { return "ERROR: " + e.Message }
+func (e *Error) Error() string    { return e.Message }

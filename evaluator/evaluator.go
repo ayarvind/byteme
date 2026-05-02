@@ -1,16 +1,19 @@
 package evaluator
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+	"time"
 	"github.com/byteme/compiler/ast"
 	"github.com/byteme/compiler/environment"
 	"github.com/byteme/compiler/object"
 )
 
 var (
-	NULL  = &object.Null{}
-	TRUE  = &object.Boolean{Value: true}
-	FALSE = &object.Boolean{Value: false}
+	NULL  = object.NULL
+	TRUE  = object.TRUE
+	FALSE = object.FALSE
 )
 
 var builtins = map[string]*object.Builtin{
@@ -144,6 +147,126 @@ var builtins = map[string]*object.Builtin{
 			return &object.String{Value: string(s.Value[idx.Value])}
 		},
 	},
+	"fileRead": {
+		Fn: func(args ...object.Object) object.Object {
+			if len(args) != 1 { return NULL }
+			path, ok := args[0].(*object.String)
+			if !ok { return NULL }
+			content, err := os.ReadFile(path.Value)
+			if err != nil {
+				return &object.Error{Message: err.Error()}
+			}
+			return &object.String{Value: string(content)}
+		},
+	},
+	"fileWrite": {
+		Fn: func(args ...object.Object) object.Object {
+			if len(args) != 2 { return NULL }
+			path, ok := args[0].(*object.String)
+			content, ok2 := args[1].(*object.String)
+			if !ok || !ok2 { return NULL }
+			err := os.WriteFile(path.Value, []byte(content.Value), 0644)
+			if err != nil {
+				return &object.Error{Message: err.Error()}
+			}
+			return TRUE
+		},
+	},
+	"fileAppend": {
+		Fn: func(args ...object.Object) object.Object {
+			if len(args) != 2 { return NULL }
+			path, ok := args[0].(*object.String)
+			content, ok2 := args[1].(*object.String)
+			if !ok || !ok2 { return NULL }
+			f, err := os.OpenFile(path.Value, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			if err != nil {
+				return &object.Error{Message: err.Error()}
+			}
+			defer f.Close()
+			if _, err := f.WriteString(content.Value); err != nil {
+				return &object.Error{Message: err.Error()}
+			}
+			return TRUE
+		},
+	},
+	"fileExists": {
+		Fn: func(args ...object.Object) object.Object {
+			if len(args) != 1 { return FALSE }
+			path, ok := args[0].(*object.String)
+			if !ok { return FALSE }
+			_, err := os.Stat(path.Value)
+			return nativeBoolToBooleanObject(!os.IsNotExist(err))
+		},
+	},
+	"jsonParse": {
+		Fn: func(args ...object.Object) object.Object {
+			if len(args) != 1 { return NULL }
+			input, ok := args[0].(*object.String)
+			if !ok { return NULL }
+			
+			var data interface{}
+			if err := json.Unmarshal([]byte(input.Value), &data); err != nil {
+				return &object.Error{Message: err.Error()}
+			}
+			return convertToByteMeObject(data)
+		},
+	},
+	"jsonStringify": {
+		Fn: func(args ...object.Object) object.Object {
+			if len(args) != 1 { return NULL }
+			input := args[0]
+			data := convertToNative(input)
+			res, err := json.Marshal(data)
+			if err != nil {
+				return &object.Error{Message: err.Error()}
+			}
+			return &object.String{Value: string(res)}
+		},
+	},
+	"timeNow": {
+		Fn: func(args ...object.Object) object.Object {
+			return &object.Integer{Value: time.Now().UnixMilli()}
+		},
+	},
+	"timeSleep": {
+		Fn: func(args ...object.Object) object.Object {
+			if len(args) != 1 { return NULL }
+			ms, ok := args[0].(*object.Integer)
+			if !ok { return NULL }
+			time.Sleep(time.Duration(ms.Value) * time.Millisecond)
+			return NULL
+		},
+	},
+	"timeFormat": {
+		Fn: func(args ...object.Object) object.Object {
+			if len(args) != 2 { return NULL }
+			ts, ok := args[0].(*object.Integer)
+			layout, ok2 := args[1].(*object.String)
+			if !ok || !ok2 { return NULL }
+			t := time.UnixMilli(ts.Value)
+			return &object.String{Value: t.Format(layout.Value)}
+		},
+	},
+	"nativeCall": {
+		Fn: func(args ...object.Object) object.Object {
+			if len(args) < 1 { return NULL }
+			funcName, ok := args[0].(*object.String)
+			if !ok { return NULL }
+			
+			nativeFn, exists := NativeRegistry[funcName.Value]
+			if !exists {
+				return &object.Error{Message: "native function not found: " + funcName.Value}
+			}
+			
+			return nativeFn(args[1:]...)
+		},
+	},
+}
+
+var NativeRegistry = make(map[string]func(...object.Object) object.Object)
+
+func RegisterNative(name string, fn func(...object.Object) object.Object) {
+	NativeRegistry[name] = fn
 }
 
 func Eval(node ast.Node, env *environment.Environment) object.Object {
@@ -271,6 +394,17 @@ func Eval(node ast.Node, env *environment.Environment) object.Object {
 			return future.Get()
 		}
 		return val
+
+	case *ast.ThrowStatement:
+		val := Eval(n.Value, env)
+		if isError(val) { return val }
+		return &object.Error{Message: val.Inspect()}
+
+	case *ast.TryStatement:
+		return evalTryStatement(n, env)
+		
+	case *ast.EnumStatement:
+		return evalEnumStatement(n, env)
 	}
 
 	return nil
@@ -282,8 +416,10 @@ func evalProgram(program *ast.Program, env *environment.Environment) object.Obje
 	for _, statement := range program.Statements {
 		result = Eval(statement, env)
 
-		if returnValue, ok := result.(*object.ReturnValue); ok {
-			return returnValue.Value
+		if result != nil {
+			if rt := result.Type(); rt == object.RETURN_VALUE_OBJ || rt == object.ERROR_OBJ {
+				return result
+			}
 		}
 	}
 
@@ -298,7 +434,7 @@ func evalBlockStatement(block *ast.BlockStatement, env *environment.Environment)
 
 		if result != nil {
 			rt := result.Type()
-			if rt == object.RETURN_VALUE_OBJ {
+			if rt == object.RETURN_VALUE_OBJ || rt == object.ERROR_OBJ {
 				return result
 			}
 		}
@@ -358,10 +494,40 @@ func evalInfixExpression(operator string, left, right object.Object) object.Obje
 		return evalFloatInfixExpression(operator, left, right)
 	case left.Type() == object.STRING_OBJ && right.Type() == object.STRING_OBJ:
 		return evalStringInfixExpression(operator, left, right)
+	case left.Type() == object.BOOLEAN_OBJ && right.Type() == object.BOOLEAN_OBJ:
+		return evalBooleanInfixExpression(operator, left, right)
 	case operator == "==":
 		return nativeBoolToBooleanObject(left == right)
 	case operator == "!=":
 		return nativeBoolToBooleanObject(left != right)
+	default:
+		return NULL
+	}
+}
+
+func evalBooleanInfixExpression(operator string, left, right object.Object) object.Object {
+	leftVal := left.(*object.Boolean).Value
+	rightVal := right.(*object.Boolean).Value
+
+	// Convert bool to int for comparison: false=0, true=1
+	lInt := 0
+	if leftVal { lInt = 1 }
+	rInt := 0
+	if rightVal { rInt = 1 }
+
+	switch operator {
+	case "==":
+		return nativeBoolToBooleanObject(leftVal == rightVal)
+	case "!=":
+		return nativeBoolToBooleanObject(leftVal != rightVal)
+	case "<":
+		return nativeBoolToBooleanObject(lInt < rInt)
+	case ">":
+		return nativeBoolToBooleanObject(lInt > rInt)
+	case "<=":
+		return nativeBoolToBooleanObject(lInt <= rInt)
+	case ">=":
+		return nativeBoolToBooleanObject(lInt >= rInt)
 	default:
 		return NULL
 	}
@@ -424,13 +590,23 @@ func evalFloatInfixExpression(operator string, left, right object.Object) object
 }
 
 func evalStringInfixExpression(operator string, left, right object.Object) object.Object {
-	if operator != "+" {
-		return NULL
-	}
-
 	leftVal := left.(*object.String).Value
 	rightVal := right.(*object.String).Value
-	return &object.String{Value: leftVal + rightVal}
+
+	switch operator {
+	case "+":
+		return &object.String{Value: leftVal + rightVal}
+	case "==":
+		return nativeBoolToBooleanObject(leftVal == rightVal)
+	case "!=":
+		return nativeBoolToBooleanObject(leftVal != rightVal)
+	case "<":
+		return nativeBoolToBooleanObject(leftVal < rightVal)
+	case ">":
+		return nativeBoolToBooleanObject(leftVal > rightVal)
+	default:
+		return NULL
+	}
 }
 
 func evalAccessExpression(left object.Object, ident *ast.Identifier) object.Object {
@@ -594,4 +770,50 @@ func unwrapReturnValue(obj object.Object) object.Object {
 		return returnValue.Value
 	}
 	return obj
+}
+
+func isError(obj object.Object) bool {
+	if obj != nil {
+		return obj.Type() == object.ERROR_OBJ
+	}
+	return false
+}
+
+func evalTryStatement(ts *ast.TryStatement, env *environment.Environment) object.Object {
+	result := Eval(ts.Body, env)
+	
+	if isError(result) && ts.CatchBody != nil {
+		catchEnv := environment.NewEnclosedEnvironment(env)
+		catchEnv.SetVal(ts.CatchVar.Value, result)
+		result = Eval(ts.CatchBody, catchEnv)
+	}
+
+	if ts.Finally != nil {
+		Eval(ts.Finally, env)
+	}
+
+	return result
+}
+
+func evalEnumStatement(es *ast.EnumStatement, env *environment.Environment) object.Object {
+	nsEnv := environment.NewEnclosedEnvironment(env)
+	for i, member := range es.Members {
+		nsEnv.Set(member.Value, "int", environment.PUBLIC, true)
+		nsEnv.SetVal(member.Value, &object.Integer{Value: int64(i)})
+	}
+	
+	ns := &object.Namespace{
+		Name: es.Name.Value,
+		Env:  nsEnv,
+	}
+	env.SetVal(es.Name.Value, ns)
+	return ns
+}
+
+func convertToByteMeObject(data interface{}) object.Object {
+	return object.ConvertToByteMeObject(data)
+}
+
+func convertToNative(obj object.Object) interface{} {
+	return object.ConvertToNative(obj)
 }
