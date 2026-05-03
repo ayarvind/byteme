@@ -1,0 +1,43 @@
+// ============================================================
+// test_http_client.byme  — ByteMe HTTP Client Demo
+//
+// Tests httpGet and httpPost against a public API.
+// Run:  byteme test_http_client.byme
+// ============================================================
+
+println("=== ByteMe HTTP Client Demo ===\n");
+
+// ── 1. Simple GET request ─────────────────────────────────────
+println("1. GET https://httpbin.org/get");
+let res = httpGet("https://httpbin.org/get");
+println("   Status:", mapGet(res, "status"));
+let body = mapGet(res, "body");
+let parsed = jsonParse(body);
+let origin = mapGet(parsed, "origin");
+println("   Your IP:", origin);
+
+// ── 2. POST request with JSON body ───────────────────────────
+println("\n2. POST https://httpbin.org/post");
+let payload = map();
+mapSet(payload, "language", "ByteMe");
+mapSet(payload, "version",  "1.0");
+mapSet(payload, "message",  "Hello from ByteMe HTTP client!");
+let jsonBody = jsonStringify(payload);
+
+let postRes = httpPost("https://httpbin.org/post", jsonBody);
+println("   Status:", mapGet(postRes, "status"));
+let postBody = mapGet(postRes, "body");
+let postParsed = jsonParse(postBody);
+let jsonField = mapGet(postParsed, "json");
+println("   Echo - language:", mapGet(jsonField, "language"));
+println("   Echo - message :", mapGet(jsonField, "message"));
+
+// ── 3. GET a JSON API ─────────────────────────────────────────
+println("\n3. GET https://jsonplaceholder.typicode.com/todos/1");
+let todo = httpGet("https://jsonplaceholder.typicode.com/todos/1");
+println("   Status:", mapGet(todo, "status"));
+let todoBody = jsonParse(mapGet(todo, "body"));
+println("   Title :", mapGet(todoBody, "title"));
+println("   Done  :", mapGet(todoBody, "completed"));
+
+println("\n=== HTTP Client Demo Complete ===");

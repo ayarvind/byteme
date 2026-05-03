@@ -257,6 +257,13 @@ func (p *Parser) parseTryStatement() *ast.TryStatement {
 		if !p.expectPeek(token.LPAREN) { return nil }
 		if !p.expectPeek(token.IDENT) { return nil }
 		stmt.CatchVar = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+		
+		if p.peekTokenIs(token.COLON) {
+			p.nextToken() // cur is :
+			if !p.expectPeek(token.IDENT) { return nil }
+			stmt.CatchVarType = p.curToken.Literal
+		}
+		
 		if !p.expectPeek(token.RPAREN) { return nil }
 		if !p.expectPeek(token.LBRACE) { return nil }
 		stmt.CatchBody = p.parseBlockStatement()

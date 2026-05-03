@@ -271,10 +271,41 @@ func (c *Compiler) Compile(node ast.Node) error {
 			if err != nil { return err }
 		}
 
+	case *ast.ThrowStatement:
+		err := c.Compile(n.Value)
+		if err != nil { return err }
+		c.emit(code.OpThrow)
+
 	case *ast.TryStatement:
-		// MVP: just compile the body and finally sequentially.
+		jumpToCatchPos := c.emit(code.OpTry, 9999)
+		
 		err := c.Compile(n.Body)
 		if err != nil { return err }
+		
+		c.emit(code.OpEndTry)
+		jumpToEndPos := c.emit(code.OpJump, 9999)
+		
+		catchPos := len(c.instructions)
+		c.changeOperand(jumpToCatchPos, catchPos)
+		
+		if n.CatchBody != nil {
+			// Catch variable is pushed onto the stack by OpThrow in VM
+			symbol := c.symbolTable.Define(n.CatchVar.Value)
+			if symbol.Scope == GlobalScope {
+				c.emit(code.OpSetGlobal, symbol.Index)
+			} else {
+				c.emit(code.OpSetLocal, symbol.Index)
+			}
+			
+			err = c.Compile(n.CatchBody)
+			if err != nil { return err }
+		} else {
+			c.emit(code.OpPop)
+		}
+		
+		endPos := len(c.instructions)
+		c.changeOperand(jumpToEndPos, endPos)
+		
 		if n.Finally != nil {
 			err = c.Compile(n.Finally)
 			if err != nil { return err }
@@ -474,6 +505,12 @@ var builtins = map[string]int{
 	"chan":          12,
 	"send":          13,
 	"recv":          14,
+	// HTTP / networking — indices assigned by RegisterHTTPBuiltins() at vm.init()
+	"httpHandle":   15,
+	"httpServe":    16,
+	"httpGet":      17,
+	"httpPost":     18,
+	"httpResponse": 19,
 }
 
 func (c *Compiler) Bytecode() *Bytecode {

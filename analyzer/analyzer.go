@@ -42,7 +42,13 @@ func New(env *environment.Environment) *Analyzer {
 	env.Set("timeSleep", "function", environment.PUBLIC, true)
 	env.Set("timeFormat", "function", environment.PUBLIC, true)
 	env.Set("nativeCall", "function", environment.PUBLIC, true)
-	
+	// HTTP / networking module
+	env.Set("httpHandle",   "function", environment.PUBLIC, true)
+	env.Set("httpServe",    "function", environment.PUBLIC, true)
+	env.Set("httpGet",      "function", environment.PUBLIC, true)
+	env.Set("httpPost",     "function", environment.PUBLIC, true)
+	env.Set("httpResponse", "function", environment.PUBLIC, true)
+
 	// Register basic types as symbols
 	env.Set("int", "type", environment.PUBLIC, true)
 	env.Set("float", "type", environment.PUBLIC, true)

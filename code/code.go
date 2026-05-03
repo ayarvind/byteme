@@ -42,6 +42,9 @@ const (
 	OpStructNew  // pop args + StructLiteral, construct StructInstance
 	OpGetField   // pop instance, push field value   (operand: const-idx of field name string)
 	OpSetField   // pop value + instance, set field  (operand: const-idx of field name string)
+	OpThrow
+	OpTry        // operand: 2-byte jump destination for catch block
+	OpEndTry
 )
 
 type Definition struct {
@@ -82,6 +85,9 @@ var definitions = map[Opcode]*Definition{
 	OpStructNew:     {"OpStructNew", []int{1}},      // operand: number of field args passed positionally
 	OpGetField:      {"OpGetField", []int{2}},       // operand: constant-pool index of field-name string
 	OpSetField:      {"OpSetField", []int{2}},       // operand: constant-pool index of field-name string
+	OpThrow:         {"OpThrow", []int{}},
+	OpTry:           {"OpTry", []int{2}},
+	OpEndTry:        {"OpEndTry", []int{}},
 }
 
 func Lookup(op byte) (*Definition, error) {

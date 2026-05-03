@@ -141,6 +141,7 @@ type TryStatement struct {
 	Token      token.Token // the 'try' token
 	Body       *BlockStatement
 	CatchVar   *Identifier // e.g. 'e' in catch(e)
+	CatchVarType string      // Optional type, e.g. 'error'
 	CatchBody  *BlockStatement
 	Finally    *BlockStatement
 }
@@ -353,7 +354,12 @@ type NamespaceLiteral struct {
 func (nl *NamespaceLiteral) expressionNode()      {}
 func (nl *NamespaceLiteral) TokenLiteral() string { return nl.Token.Literal }
 func (nl *NamespaceLiteral) String() string {
-	return "namespace " + nl.Name.String() + " " + nl.Body.String()
+	var out bytes.Buffer
+	if nl.IsPublic {
+		out.WriteString("public ")
+	}
+	out.WriteString("namespace " + nl.Name.String() + " " + nl.Body.String())
+	return out.String()
 }
 
 type StructLiteral struct {

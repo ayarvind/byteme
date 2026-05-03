@@ -21,6 +21,21 @@ type VM struct {
 
 	frames      []*Frame
 	framesIndex int
+
+	catchHandlers []*CatchHandler
+}
+
+type CatchHandler struct {
+	ip          int
+	sp          int
+	framesIndex int
+}
+
+// httpBuiltinStart holds the index where HTTP builtins begin in the Builtins slice.
+var httpBuiltinStart int
+
+func init() {
+	httpBuiltinStart = object.RegisterHTTPBuiltins()
 }
 
 func New(bytecode *compiler.Bytecode) *VM {
@@ -28,29 +43,68 @@ func New(bytecode *compiler.Bytecode) *VM {
 	frames := make([]*Frame, MaxFrames)
 	frames[0] = mainFrame
 
-	return &VM{
+	vm := &VM{
 		constants:   bytecode.Constants,
 		globals:     make([]object.Object, GlobalsSize),
 		stack:       make([]object.Object, StackSize),
 		sp:          0,
-		frames:      frames,
-		framesIndex: 1,
+		frames:        frames,
+		framesIndex:   1,
+		catchHandlers: make([]*CatchHandler, 0),
 	}
+	vm.registerRunner()
+	return vm
 }
 
 func NewWithGlobalStore(constants []object.Object, globals []object.Object) *VM {
 	frames := make([]*Frame, MaxFrames)
-	// We don't have a main fn here, just an empty frame since it will be overwritten or pushed
 	frames[0] = NewFrame(code.Instructions{}, 0)
 
-	return &VM{
+	vm := &VM{
 		constants:   constants,
 		globals:     globals,
 		stack:       make([]object.Object, StackSize),
 		sp:          0,
-		frames:      frames,
-		framesIndex: 1,
+		frames:        frames,
+		framesIndex:   1,
+		catchHandlers: make([]*CatchHandler, 0),
 	}
+	vm.registerRunner()
+	return vm
+}
+
+// registerRunner sets the package-level object.RunFunction so that HTTP
+// (and other) builtins can call back into ByteMe compiled functions.
+func (vm *VM) registerRunner() {
+	object.RunFunction = func(fn *object.CompiledFunction, constants []object.Object, globals []object.Object, args []object.Object) object.Object {
+		child := NewWithGlobalStore(constants, globals)
+		// Push the function then its arguments, then set up the call frame.
+		if err := child.push(fn); err != nil {
+			return object.NULL
+		}
+		for _, a := range args {
+			if err := child.push(a); err != nil {
+				return object.NULL
+			}
+		}
+		frame := NewFrame(fn.Instructions, child.sp-len(args))
+		child.pushFrame(frame)
+		child.sp = frame.basePointer + fn.NumLocals
+
+		if err := child.Run(); err != nil {
+			return &object.Error{Message: err.Error()}
+		}
+		return child.StackTop()
+	}
+
+	// Patch the httpRoutes entries so they carry the VM's constants & globals.
+	// We do this lazily when a handler fires, by passing them through RunFunction.
+	// The HTTP server reads them from the route entry set via httpHandle.
+	// Since httpHandle is called at script evaluation time, the globals are live
+	// and the entry can snapshot them now.
+	//
+	// We expose a post-registration hook so httpHandle can store the current VM refs.
+	object.SetVMContext(&vm.constants, &vm.globals)
 }
 
 func (vm *VM) currentFrame() *Frame {
@@ -69,6 +123,13 @@ func (vm *VM) popFrame() *Frame {
 
 func (vm *VM) LastPoppedStackElem() object.Object {
 	return vm.stack[vm.sp]
+}
+
+func (vm *VM) StackTop() object.Object {
+	if vm.sp == 0 {
+		return object.NULL
+	}
+	return vm.stack[vm.sp-1]
 }
 
 func (vm *VM) Run() error {
@@ -306,6 +367,35 @@ func (vm *VM) Run() error {
 				vm.push(instance)
 			default:
 				return fmt.Errorf("cannot set field '%s' on %s", fieldName, instance.Type())
+			}
+
+		case code.OpThrow:
+			errValue := vm.pop()
+			if len(vm.catchHandlers) == 0 {
+				return fmt.Errorf("uncaught error: %s", errValue.Inspect())
+			}
+			// Find the nearest handler
+			handler := vm.catchHandlers[len(vm.catchHandlers)-1]
+			vm.catchHandlers = vm.catchHandlers[:len(vm.catchHandlers)-1]
+
+			// Restore stack and frame state
+			vm.sp = handler.sp
+			vm.framesIndex = handler.framesIndex
+			vm.currentFrame().ip = handler.ip - 1
+			vm.push(errValue)
+
+		case code.OpTry:
+			jumpToCatch := int(binary.BigEndian.Uint16(ins[ip+1:]))
+			vm.currentFrame().ip += 2
+			vm.catchHandlers = append(vm.catchHandlers, &CatchHandler{
+				ip:          jumpToCatch,
+				sp:          vm.sp,
+				framesIndex: vm.framesIndex,
+			})
+
+		case code.OpEndTry:
+			if len(vm.catchHandlers) > 0 {
+				vm.catchHandlers = vm.catchHandlers[:len(vm.catchHandlers)-1]
 			}
 		}
 	}
