@@ -1,4 +1,7 @@
 let c = chan();
-send(c, "hello");
+spawn send(c, "hello");
+spawn send(c, "world");
 let x = recv(c);
+let y = recv(c);
 println(x);
+println(y);

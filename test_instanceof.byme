@@ -1,0 +1,33 @@
+// test_instanceof.byme
+struct Point { x: int, y: int }
+struct Color { r: int, g: int, b: int }
+
+let p = Point(10, 20);
+let c = Color(255, 0, 0);
+
+println("--- Instance Checks ---");
+println("p is Point?", instanceOf(p, Point));
+println("p is Color?", instanceOf(p, Color));
+println("c is Color?", instanceOf(c, Color));
+
+println("\n--- Primitive Checks ---");
+let n = 123;
+let s = "hello";
+println("n is int?", instanceOf(n, "INTEGER"));
+println("s is string?", instanceOf(s, "STRING"));
+println("n is string?", instanceOf(n, "STRING"));
+
+println("\n--- Complex Case ---");
+let list = [p, c];
+let i = 0;
+while (i < len(list)) {
+    let item = list[i];
+    if (instanceof(item, Point)) {
+        println("Found a Point at", item.x, item.y);
+    } else {
+        if (instanceof(item, Color)) {
+            println("Found a Color with R =", item.r);
+        }
+    }
+    i = i + 1;
+}

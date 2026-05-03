@@ -81,6 +81,7 @@ func New(env *environment.Environment) *Analyzer {
 	env.Set("fRead",         "function", environment.PUBLIC, true)
 	env.Set("fWrite",        "function", environment.PUBLIC, true)
 	env.Set("fSeek",         "function", environment.PUBLIC, true)
+	env.Set("instanceOf",    "function", environment.PUBLIC, true)
 
 	// Register basic types as symbols
 	env.Set("int", "type", environment.PUBLIC, true)
@@ -249,7 +250,7 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 			return "any"
 		}
 
-		if leftType != rightType {
+		if leftType != rightType && leftType != "any" && rightType != "any" {
 			a.error(n.Token, "type mismatch in expression: %s %s %s", leftType, n.Operator, rightType)
 			return "any"
 		}

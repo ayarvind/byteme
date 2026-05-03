@@ -444,6 +444,35 @@ var Builtins = []*Builtin{
 			return &Integer{Value: pos}
 		},
 	},
+	{ // 42: instanceOf
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 {
+				return &Error{Message: fmt.Sprintf("wrong number of arguments. got=%d, want=2", len(args))}
+			}
+			obj := args[0]
+			targetType := args[1]
+
+			switch t := targetType.(type) {
+			case *StructLiteral:
+				instance, ok := obj.(*StructInstance)
+				if !ok {
+					return FALSE
+				}
+				if instance.Definition.Name == t.Name {
+					return TRUE
+				}
+				return FALSE
+			case *String:
+				// Primitive type check via string name
+				if string(obj.Type()) == t.Value {
+					return TRUE
+				}
+				return FALSE
+			default:
+				return &Error{Message: fmt.Sprintf("second argument to `instanceof` must be a type or type name string, got %s", targetType.Type())}
+			}
+		},
+	},
 }
 
 func ConvertToByteMeObject(val interface{}) Object {
