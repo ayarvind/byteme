@@ -400,6 +400,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 			Instructions:  enclosedCompiler.instructions,
 			NumLocals:     enclosedCompiler.symbolTable.numDefinitions,
 			NumParameters: len(n.Parameters),
+			IsAsync:       n.IsAsync,
 		}
 
 		c.emit(code.OpConstant, c.addConstant(compiledFn))
@@ -461,6 +462,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 						Instructions:  enclosedCompiler.instructions,
 						NumLocals:     enclosedCompiler.symbolTable.numDefinitions,
 						NumParameters: len(fnLit.Parameters),
+						IsAsync:       fnLit.IsAsync,
 					}
 					c.emit(code.OpConstant, c.addConstant(compiledFn))
 					sym := c.symbolTable.Define(compoundName)
@@ -484,6 +486,11 @@ func (c *Compiler) Compile(node ast.Node) error {
 		}
 
 		c.emit(code.OpSpawn, len(n.Call.Arguments))
+
+	case *ast.AwaitExpression:
+		err := c.Compile(n.Expression)
+		if err != nil { return err }
+		c.emit(code.OpAwait)
 	}
 
 	return nil

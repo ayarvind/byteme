@@ -76,6 +76,7 @@ type CompiledFunction struct {
 	Instructions []byte
 	NumLocals    int
 	NumParameters int
+	IsAsync       bool
 }
 func (cf *CompiledFunction) Type() ObjectType { return "COMPILED_FUNCTION" }
 func (cf *CompiledFunction) Inspect() string  { return fmt.Sprintf("CompiledFunction[%p]", cf) }

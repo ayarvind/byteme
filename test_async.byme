@@ -1,0 +1,15 @@
+// test_async.byme
+async fn compute(x, y) {
+    println("Thinking...");
+    timeSleep(1000);
+    println("Done thinking!");
+    return x + y;
+}
+
+println("Starting async test...");
+let future = compute(10, 20);
+println("Got future, doing other things...");
+
+println("Waiting for result...");
+let result = await future;
+println("Result is:", result);

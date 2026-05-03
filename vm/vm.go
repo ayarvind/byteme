@@ -251,9 +251,34 @@ func (vm *VM) Run() error {
 				if numArgs != fn.NumParameters {
 					return fmt.Errorf("wrong number of arguments: want=%d, got=%d", fn.NumParameters, numArgs)
 				}
-				frame := NewFrame(fn.Instructions, vm.sp-numArgs)
-				vm.pushFrame(frame)
-				vm.sp = frame.basePointer + fn.NumLocals
+				
+				if fn.IsAsync {
+					// Async call: return a Future immediately
+					future := &object.Future{ValueChan: make(chan object.Object, 1)}
+					newVM := NewWithGlobalStore(vm.constants, vm.globals)
+					
+					newVM.push(fn)
+					for i := vm.sp - numArgs; i < vm.sp; i++ {
+						newVM.push(vm.stack[i])
+					}
+					
+					vm.sp = vm.sp - numArgs - 1
+					vm.push(future)
+
+					go func() {
+						frame := NewFrame(fn.Instructions, newVM.sp-numArgs)
+						newVM.pushFrame(frame)
+						newVM.sp = frame.basePointer + fn.NumLocals
+						newVM.Run()
+						result := newVM.StackTop()
+						future.ValueChan <- result
+					}()
+				} else {
+					frame := NewFrame(fn.Instructions, vm.sp-numArgs)
+					vm.pushFrame(frame)
+					vm.sp = frame.basePointer + fn.NumLocals
+				}
+
 			default:
 				return fmt.Errorf("calling non-function and non-built-in: %T", fn)
 			}
@@ -325,6 +350,16 @@ func (vm *VM) Run() error {
 		case code.OpNull:
 			err := vm.push(object.NULL)
 			if err != nil { return err }
+
+		case code.OpAwait:
+			obj := vm.pop()
+			if future, ok := obj.(*object.Future); ok {
+				result := future.Get()
+				vm.push(result)
+			} else {
+				// If it's not a future, just return it (like JS await)
+				vm.push(obj)
+			}
 
 		// ── Struct opcodes ────────────────────────────────────────────────
 		case code.OpStructDef:
