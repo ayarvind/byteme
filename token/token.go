@@ -41,6 +41,7 @@ const (
 	ARROW     TokenType = "->"
 	DOT       TokenType = "."
 	AT        TokenType = "@"
+	MOD       TokenType = "%"
 
 	// Keywords
 	FUNCTION  TokenType = "FUNCTION"

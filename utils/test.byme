@@ -1,7 +1,0 @@
-// utils/test.byme
-let Status = "ACTIVE";
-let ErrorCode = 404;
-
-// For now, since VM function compilation is the next step,
-// we'll mock myFunction as a string to prove the import works!
-let myFunction = "<Compiled Function Placeholder>";

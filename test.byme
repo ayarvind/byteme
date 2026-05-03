@@ -1,0 +1,6 @@
+let x: int = 10 % 3;
+let y: int = 31 % 3;
+println(x)
+println(y)
+let z: int = x + y;
+println(z)

@@ -151,7 +151,7 @@ func (vm *VM) Run() error {
 			err := vm.push(vm.constants[constIndex])
 			if err != nil { return err }
 
-		case code.OpAdd, code.OpSub, code.OpMul, code.OpDiv:
+		case code.OpAdd, code.OpSub, code.OpMul, code.OpDiv, code.OpMod:
 			err := vm.executeBinaryArithmetic(op)
 			if err != nil { return err }
 
@@ -508,6 +508,7 @@ func (vm *VM) executeBinaryArithmetic(op code.Opcode) error {
 		case code.OpSub: result = leftValue - rightValue
 		case code.OpMul: result = leftValue * rightValue
 		case code.OpDiv: result = leftValue / rightValue
+		case code.OpMod: result = leftValue % rightValue
 		}
 		return vm.push(&object.Integer{Value: result})
 	}

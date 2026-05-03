@@ -103,6 +103,10 @@ func (o *Optimizer) Optimize(node ast.Node) ast.Node {
 					if r.Value != 0 {
 						return &ast.IntegerLiteral{Token: n.Token, Value: l.Value / r.Value}
 					}
+				case "%":
+					if r.Value != 0 {
+						return &ast.IntegerLiteral{Token: n.Token, Value: l.Value % r.Value}
+					}
 				}
 			}
 		}
