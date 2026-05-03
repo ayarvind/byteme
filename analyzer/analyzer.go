@@ -51,7 +51,8 @@ func New(env *environment.Environment) *Analyzer {
 	env.Set("httpPost",     "function", environment.PUBLIC, true)
 	env.Set("httpResponse", "function", environment.PUBLIC, true)
 	
-	// New Standard Library
+	env.Set("toInt",        "function", environment.PUBLIC, true)
+	env.Set("toFloat",      "function", environment.PUBLIC, true)
 	env.Set("len",          "function", environment.PUBLIC, true)
 	env.Set("envGet",       "function", environment.PUBLIC, true)
 	env.Set("envSet",       "function", environment.PUBLIC, true)

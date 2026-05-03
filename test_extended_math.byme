@@ -1,0 +1,57 @@
+import "lib/math.byme"
+
+println("=== ByteMe Extended Math & Bitwise Test ===");
+
+// ── 1. Constants ─────────────────────────────────────────────
+println("\n1. Constants:");
+println("   PI    :", Math.PI);
+println("   E     :", Math.E);
+println("   SQRT2 :", Math.SQRT2);
+println("   LN2   :", Math.LN2);
+
+// ── 2. Basic Math ─────────────────────────────────────────────
+println("\n2. Basic Math:");
+println("   abs(-10.5) :", Math.abs(-10.5));
+println("   sqrt(2.0)  :", Math.sqrt(2.0));
+println("   pow(2, 8)  :", Math.pow(2, 8));
+println("   ceil(3.2)  :", Math.ceil(3.2));
+println("   floor(3.8) :", Math.floor(3.8));
+
+// ── 3. Trigonometry ───────────────────────────────────────────
+println("\n3. Trigonometry:");
+let rad = Math.radians(90.0);
+println("   radians(90) :", rad);
+println("   sin(rad)    :", Math.sin(rad));
+println("   cos(rad)    :", Math.cos(rad)); // Should be close to 0
+println("   tan(0.5)    :", Math.tan(0.5));
+
+// ── 4. Logarithms ─────────────────────────────────────────────
+println("\n4. Logarithms:");
+println("   exp(1.0)     :", Math.exp(1.0)); // Should be E
+println("   log(Math.E)  :", Math.log(Math.E));
+println("   log10(100.0) :", Math.log10(100.0));
+
+// ── 5. Bitwise Operators ──────────────────────────────────────
+println("\n5. Bitwise Operators:");
+let a = 12; // 1100
+let b = 10; // 1010
+
+println("   a & b (12 & 10) :", a & b);   // 1000 = 8
+println("   a | b (12 | 10) :", a | b);   // 1110 = 14
+println("   a ^ b (12 ^ 10) :", a ^ b);   // 0110 = 6
+println("   ~a (~12)        :", ~a);       // -(12+1) = -13
+
+// ── 6. Shift Operators ────────────────────────────────────────
+println("\n6. Shift Operators:");
+let val = 1;
+println("   1 << 1  :", val << 1);
+println("   1 << 10 :", val << 10);
+println("   1024 >> 5 :", 1024 >> 5);
+
+// ── 7. Utilities ──────────────────────────────────────────────
+println("\n7. Utilities:");
+println("   lerp(0, 100, 0.5)    :", Math.lerp(0, 100, 0.5));
+println("   clamp(50, 0, 10)     :", Math.clamp(50, 0, 10));
+println("   Math.bitAnd(12, 10) :", Math.bitAnd(12, 10));
+
+println("\n=== Test Complete ===");

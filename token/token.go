@@ -24,6 +24,13 @@ const (
 	GT TokenType = ">"
 	LTE TokenType = "<="
 	GTE TokenType = ">="
+	LSHIFT TokenType = "<<"
+	RSHIFT TokenType = ">>"
+
+	BIT_AND TokenType = "&"
+	BIT_OR  TokenType = "|"
+	BIT_XOR TokenType = "^"
+	BIT_NOT TokenType = "~"
 
 	EQ     TokenType = "=="
 	NOT_EQ TokenType = "!="

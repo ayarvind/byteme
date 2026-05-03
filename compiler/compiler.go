@@ -247,6 +247,16 @@ func (c *Compiler) Compile(node ast.Node) error {
 			c.emit(code.OpEqual)
 		case "!=":
 			c.emit(code.OpNotEqual)
+		case "&":
+			c.emit(code.OpBitAnd)
+		case "|":
+			c.emit(code.OpBitOr)
+		case "^":
+			c.emit(code.OpBitXor)
+		case "<<":
+			c.emit(code.OpLShift)
+		case ">>":
+			c.emit(code.OpRShift)
 		default:
 			return fmt.Errorf("unknown operator %s", n.Operator)
 		}
@@ -261,6 +271,8 @@ func (c *Compiler) Compile(node ast.Node) error {
 			c.emit(code.OpBang)
 		case "-":
 			c.emit(code.OpMinus)
+		case "~":
+			c.emit(code.OpBitNot)
 		default:
 			return fmt.Errorf("unknown operator %s", n.Operator)
 		}
@@ -268,6 +280,10 @@ func (c *Compiler) Compile(node ast.Node) error {
 	case *ast.IntegerLiteral:
 		integer := &object.Integer{Value: n.Value}
 		c.emit(code.OpConstant, c.addConstant(integer))
+
+	case *ast.FloatLiteral:
+		float := &object.Float{Value: n.Value}
+		c.emit(code.OpConstant, c.addConstant(float))
 
 	case *ast.StringLiteral:
 		str := &object.String{Value: n.Value}
@@ -579,6 +595,14 @@ func (c *Compiler) Compile(node ast.Node) error {
 				if fnLit, ok := s.Expression.(*ast.FunctionLiteral); ok && fnLit.Name != nil {
 					compoundName := nsName + "." + fnLit.Name.Value
 					
+					// Define names in symbol table BEFORE compiling body to allow recursion
+					sym := c.symbolTable.Define(compoundName)
+					
+					// Alias for internal usage
+					aliasSym := sym
+					aliasSym.Name = fnLit.Name.Value
+					c.symbolTable.store[fnLit.Name.Value] = aliasSym
+
 					enclosedCompiler := NewEnclosedCompiler(c)
 					for _, p := range fnLit.Parameters {
 						enclosedCompiler.symbolTable.Define(p.Name.Value)
@@ -594,17 +618,13 @@ func (c *Compiler) Compile(node ast.Node) error {
 						IsAsync:       fnLit.IsAsync,
 					}
 					c.emit(code.OpConstant, c.addConstant(compiledFn))
-					sym := c.symbolTable.Define(compoundName)
+					
+					// Use the previously defined sym
 					if sym.Scope == GlobalScope {
 						c.emit(code.OpSetGlobal, sym.Index)
 					} else {
 						c.emit(code.OpSetLocal, sym.Index)
 					}
-					
-					// Alias for internal usage
-					aliasSym := sym
-					aliasSym.Name = fnLit.Name.Value
-					c.symbolTable.store[fnLit.Name.Value] = aliasSym
 				}
 			}
 		}
@@ -676,11 +696,28 @@ var builtins = map[string]int{
 	"instanceOf":    42,
 	"mapHas":       43,
 	"charAt":       44,
-	"httpHandle":   45,
-	"httpServe":    46,
-	"httpGet":      47,
-	"httpPost":     48,
-	"httpResponse": 49,
+	"toInt":        45,
+	"toFloat":      46,
+	"mathSin":      47,
+	"mathCos":      48,
+	"mathTan":      49,
+	"mathSqrt":     50,
+	"mathPow":      51,
+	"mathLog":      52,
+	"mathLog10":    53,
+	"mathExp":      54,
+	"mathAsin":     55,
+	"mathAcos":     56,
+	"mathAtan":     57,
+	"mathAtan2":    58,
+	"mathAbs":      59,
+	"mathCeil":     60,
+	"mathFloor":    61,
+	"httpHandle":   62,
+	"httpServe":    63,
+	"httpGet":      64,
+	"httpPost":     65,
+	"httpResponse": 66,
 }
 
 func (c *Compiler) Bytecode() *Bytecode {

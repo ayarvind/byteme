@@ -17,6 +17,11 @@ const (
 	OpMul
 	OpDiv
 	OpMod
+	OpBitAnd
+	OpBitOr
+	OpBitXor
+	OpLShift
+	OpRShift
 	OpPop
 	OpTrue
 	OpFalse
@@ -25,6 +30,7 @@ const (
 	OpGreaterThan
 	OpMinus
 	OpBang
+	OpBitNot
 	OpGetBuiltin
 	OpCall
 	OpReturnValue
@@ -62,6 +68,11 @@ var definitions = map[Opcode]*Definition{
 	OpMul:         {"OpMul", []int{}},
 	OpDiv:         {"OpDiv", []int{}},
 	OpMod:         {"OpMod", []int{}},
+	OpBitAnd:      {"OpBitAnd", []int{}},
+	OpBitOr:       {"OpBitOr", []int{}},
+	OpBitXor:      {"OpBitXor", []int{}},
+	OpLShift:      {"OpLShift", []int{}},
+	OpRShift:      {"OpRShift", []int{}},
 	OpPop:         {"OpPop", []int{}},
 	OpTrue:        {"OpTrue", []int{}},
 	OpFalse:       {"OpFalse", []int{}},
@@ -70,6 +81,7 @@ var definitions = map[Opcode]*Definition{
 	OpGreaterThan: {"OpGreaterThan", []int{}},
 	OpMinus:       {"OpMinus", []int{}},
 	OpBang:        {"OpBang", []int{}},
+	OpBitNot:      {"OpBitNot", []int{}},
 	OpGetBuiltin:  {"OpGetBuiltin", []int{1}}, // 1-byte index to builtin table
 	OpCall:        {"OpCall", []int{1}},       // 1-byte number of arguments
 	OpReturnValue: {"OpReturnValue", []int{}},

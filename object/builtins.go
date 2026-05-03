@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"regexp"
 	"path/filepath"
+	"math"
 )
 
 var Builtins = []*Builtin{
@@ -496,6 +497,152 @@ var Builtins = []*Builtin{
 				return NULL
 			}
 			return &String{Value: string(s.Value[i.Value])}
+		},
+	},
+	{ // 45: toInt
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			switch arg := args[0].(type) {
+			case *Integer: return arg
+			case *Float: return &Integer{Value: int64(arg.Value)}
+			default: return NULL
+			}
+		},
+	},
+	{ // 46: toFloat
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			switch arg := args[0].(type) {
+			case *Integer: return &Float{Value: float64(arg.Value)}
+			case *Float: return arg
+			default: return NULL
+			}
+		},
+	},
+	{ // 47: mathSin
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			val := 0.0
+			if f, ok := args[0].(*Float); ok { val = f.Value } else if i, ok := args[0].(*Integer); ok { val = float64(i.Value) }
+			return &Float{Value: math.Sin(val)}
+		},
+	},
+	{ // 48: mathCos
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			val := 0.0
+			if f, ok := args[0].(*Float); ok { val = f.Value } else if i, ok := args[0].(*Integer); ok { val = float64(i.Value) }
+			return &Float{Value: math.Cos(val)}
+		},
+	},
+	{ // 49: mathTan
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			val := 0.0
+			if f, ok := args[0].(*Float); ok { val = f.Value } else if i, ok := args[0].(*Integer); ok { val = float64(i.Value) }
+			return &Float{Value: math.Tan(val)}
+		},
+	},
+	{ // 50: mathSqrt
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			val := 0.0
+			if f, ok := args[0].(*Float); ok { val = f.Value } else if i, ok := args[0].(*Integer); ok { val = float64(i.Value) }
+			return &Float{Value: math.Sqrt(val)}
+		},
+	},
+	{ // 51: mathPow
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 { return NULL }
+			v1, v2 := 0.0, 0.0
+			if f, ok := args[0].(*Float); ok { v1 = f.Value } else if i, ok := args[0].(*Integer); ok { v1 = float64(i.Value) }
+			if f, ok := args[1].(*Float); ok { v2 = f.Value } else if i, ok := args[1].(*Integer); ok { v2 = float64(i.Value) }
+			return &Float{Value: math.Pow(v1, v2)}
+		},
+	},
+	{ // 52: mathLog
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			val := 0.0
+			if f, ok := args[0].(*Float); ok { val = f.Value } else if i, ok := args[0].(*Integer); ok { val = float64(i.Value) }
+			return &Float{Value: math.Log(val)}
+		},
+	},
+	{ // 53: mathLog10
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			val := 0.0
+			if f, ok := args[0].(*Float); ok { val = f.Value } else if i, ok := args[0].(*Integer); ok { val = float64(i.Value) }
+			return &Float{Value: math.Log10(val)}
+		},
+	},
+	{ // 54: mathExp
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			val := 0.0
+			if f, ok := args[0].(*Float); ok { val = f.Value } else if i, ok := args[0].(*Integer); ok { val = float64(i.Value) }
+			return &Float{Value: math.Exp(val)}
+		},
+	},
+	{ // 55: mathAsin
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			val := 0.0
+			if f, ok := args[0].(*Float); ok { val = f.Value } else if i, ok := args[0].(*Integer); ok { val = float64(i.Value) }
+			return &Float{Value: math.Asin(val)}
+		},
+	},
+	{ // 56: mathAcos
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			val := 0.0
+			if f, ok := args[0].(*Float); ok { val = f.Value } else if i, ok := args[0].(*Integer); ok { val = float64(i.Value) }
+			return &Float{Value: math.Acos(val)}
+		},
+	},
+	{ // 57: mathAtan
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			val := 0.0
+			if f, ok := args[0].(*Float); ok { val = f.Value } else if i, ok := args[0].(*Integer); ok { val = float64(i.Value) }
+			return &Float{Value: math.Atan(val)}
+		},
+	},
+	{ // 58: mathAtan2
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 { return NULL }
+			v1, v2 := 0.0, 0.0
+			if f, ok := args[0].(*Float); ok { v1 = f.Value } else if i, ok := args[0].(*Integer); ok { v1 = float64(i.Value) }
+			if f, ok := args[1].(*Float); ok { v2 = f.Value } else if i, ok := args[1].(*Integer); ok { v2 = float64(i.Value) }
+			return &Float{Value: math.Atan2(v1, v2)}
+		},
+	},
+	{ // 59: mathAbs
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			if f, ok := args[0].(*Float); ok { return &Float{Value: math.Abs(f.Value)} }
+			if i, ok := args[0].(*Integer); ok {
+				val := i.Value
+				if val < 0 { val = -val }
+				return &Integer{Value: val}
+			}
+			return NULL
+		},
+	},
+	{ // 60: mathCeil
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			val := 0.0
+			if f, ok := args[0].(*Float); ok { val = f.Value } else if i, ok := args[0].(*Integer); ok { return i }
+			return &Float{Value: math.Ceil(val)}
+		},
+	},
+	{ // 61: mathFloor
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			val := 0.0
+			if f, ok := args[0].(*Float); ok { val = f.Value } else if i, ok := args[0].(*Integer); ok { return i }
+			return &Float{Value: math.Floor(val)}
 		},
 	},
 }

@@ -151,7 +151,8 @@ func (vm *VM) Run() error {
 			err := vm.push(vm.constants[constIndex])
 			if err != nil { return err }
 
-		case code.OpAdd, code.OpSub, code.OpMul, code.OpDiv, code.OpMod:
+		case code.OpAdd, code.OpSub, code.OpMul, code.OpDiv, code.OpMod,
+			code.OpBitAnd, code.OpBitOr, code.OpBitXor, code.OpLShift, code.OpRShift:
 			err := vm.executeBinaryArithmetic(op)
 			if err != nil { return err }
 
@@ -173,6 +174,10 @@ func (vm *VM) Run() error {
 
 		case code.OpBang:
 			err := vm.executeBangOperator()
+			if err != nil { return err }
+
+		case code.OpBitNot:
+			err := vm.executePrefixBitNot()
 			if err != nil { return err }
 
 		case code.OpJump:
@@ -504,13 +509,33 @@ func (vm *VM) executeBinaryArithmetic(op code.Opcode) error {
 		rightValue := right.(*object.Integer).Value
 		var result int64
 		switch op {
-		case code.OpAdd: result = leftValue + rightValue
-		case code.OpSub: result = leftValue - rightValue
-		case code.OpMul: result = leftValue * rightValue
-		case code.OpDiv: result = leftValue / rightValue
-		case code.OpMod: result = leftValue % rightValue
+		case code.OpAdd:      result = leftValue + rightValue
+		case code.OpSub:      result = leftValue - rightValue
+		case code.OpMul:      result = leftValue * rightValue
+		case code.OpDiv:      result = leftValue / rightValue
+		case code.OpMod:      result = leftValue % rightValue
+		case code.OpBitAnd:   result = leftValue & rightValue
+		case code.OpBitOr:    result = leftValue | rightValue
+		case code.OpBitXor:   result = leftValue ^ rightValue
+		case code.OpLShift:   result = leftValue << uint(rightValue)
+		case code.OpRShift:   result = leftValue >> uint(rightValue)
 		}
 		return vm.push(&object.Integer{Value: result})
+	}
+
+	if left.Type() == object.FLOAT_OBJ || right.Type() == object.FLOAT_OBJ {
+		var lVal, rVal float64
+		if left.Type() == object.FLOAT_OBJ { lVal = left.(*object.Float).Value } else { lVal = float64(left.(*object.Integer).Value) }
+		if right.Type() == object.FLOAT_OBJ { rVal = right.(*object.Float).Value } else { rVal = float64(right.(*object.Integer).Value) }
+		
+		var result float64
+		switch op {
+		case code.OpAdd: result = lVal + rVal
+		case code.OpSub: result = lVal - rVal
+		case code.OpMul: result = lVal * rVal
+		case code.OpDiv: result = lVal / rVal
+		}
+		return vm.push(&object.Float{Value: result})
 	}
 
 	return fmt.Errorf("unsupported types for binary operation: %s and %s", left.Type(), right.Type())
@@ -521,6 +546,9 @@ func (vm *VM) executeComparison(op code.Opcode) error {
 	left := vm.pop()
 	if left.Type() == object.INTEGER_OBJ && right.Type() == object.INTEGER_OBJ {
 		return vm.executeIntegerComparison(op, left, right)
+	}
+	if left.Type() == object.FLOAT_OBJ || right.Type() == object.FLOAT_OBJ {
+		return vm.executeFloatComparison(op, left, right)
 	}
 	if left.Type() == object.BOOLEAN_OBJ && right.Type() == object.BOOLEAN_OBJ {
 		return vm.executeBooleanComparison(op, left, right)
@@ -543,6 +571,19 @@ func (vm *VM) executeIntegerComparison(op code.Opcode, left, right object.Object
 	}
 }
 
+func (vm *VM) executeFloatComparison(op code.Opcode, left, right object.Object) error {
+	var lVal, rVal float64
+	if left.Type() == object.FLOAT_OBJ { lVal = left.(*object.Float).Value } else { lVal = float64(left.(*object.Integer).Value) }
+	if right.Type() == object.FLOAT_OBJ { rVal = right.(*object.Float).Value } else { rVal = float64(right.(*object.Integer).Value) }
+	
+	switch op {
+	case code.OpEqual: return vm.push(nativeBoolToBooleanObject(lVal == rVal))
+	case code.OpNotEqual: return vm.push(nativeBoolToBooleanObject(lVal != rVal))
+	case code.OpGreaterThan: return vm.push(nativeBoolToBooleanObject(lVal > rVal))
+	default: return fmt.Errorf("unknown operator: %d", op)
+	}
+}
+
 func (vm *VM) executeBooleanComparison(op code.Opcode, left, right object.Object) error {
 	leftVal := left.(*object.Boolean).Value
 	rightVal := right.(*object.Boolean).Value
@@ -559,11 +600,16 @@ func (vm *VM) executeBooleanComparison(op code.Opcode, left, right object.Object
 
 func (vm *VM) executePrefixMinus() error {
 	operand := vm.pop()
-	if operand.Type() != object.INTEGER_OBJ {
+	switch operand.Type() {
+	case object.INTEGER_OBJ:
+		value := operand.(*object.Integer).Value
+		return vm.push(&object.Integer{Value: -value})
+	case object.FLOAT_OBJ:
+		value := operand.(*object.Float).Value
+		return vm.push(&object.Float{Value: -value})
+	default:
 		return fmt.Errorf("unsupported type for prefix minus: %s", operand.Type())
 	}
-	value := operand.(*object.Integer).Value
-	return vm.push(&object.Integer{Value: -value})
 }
 
 func (vm *VM) executeBangOperator() error {
@@ -574,6 +620,15 @@ func (vm *VM) executeBangOperator() error {
 	case object.NULL: return vm.push(object.TRUE)
 	default: return vm.push(object.FALSE)
 	}
+}
+
+func (vm *VM) executePrefixBitNot() error {
+	operand := vm.pop()
+	if operand.Type() != object.INTEGER_OBJ {
+		return fmt.Errorf("unsupported type for bitwise not: %s", operand.Type())
+	}
+	value := operand.(*object.Integer).Value
+	return vm.push(&object.Integer{Value: ^value})
 }
 
 func (vm *VM) push(obj object.Object) error {

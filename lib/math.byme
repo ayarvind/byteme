@@ -1,0 +1,97 @@
+// ByteMe Standard Library: Math
+// This module provides common mathematical functions and constants.
+// Leverages native Go math implementations for performance and precision.
+
+public namespace Math {
+    // ── Constants ───────────────────────────────────────────────────────────
+    public let PI      = 3.14159265358979323846;
+    public let E       = 2.71828182845904523536;
+    public let PHI     = 1.61803398874989484820;
+    public let SQRT2   = 1.41421356237309504880;
+    public let LN2     = 0.69314718055994530941;
+    public let LN10    = 2.30258509299404568402;
+    public let LOG2E   = 1.44269504088896340736;
+    public let LOG10E  = 0.43429448190325182765;
+
+    // ── Basic Functions ─────────────────────────────────────────────────────
+    
+    // Returns the absolute value of x
+    public fn abs(x) { return mathAbs(x); }
+
+    // Returns the square root of x
+    public fn sqrt(x) { return mathSqrt(x); }
+
+    // Returns base raised to the power of exp
+    public fn pow(base, exp) { return mathPow(base, exp); }
+
+    // Returns the largest integer less than or equal to x
+    public fn floor(x) { return mathFloor(x); }
+
+    // Returns the smallest integer greater than or equal to x
+    public fn ceil(x) { return mathCeil(x); }
+
+    // Returns the maximum of a and b
+    public fn max(a, b) {
+        if (a > b) { return a; }
+        return b;
+    }
+
+    // Returns the minimum of a and b
+    public fn min(a, b) {
+        if (a < b) { return a; }
+        return b;
+    }
+
+    // ── Trigonometry ────────────────────────────────────────────────────────
+    
+    public fn sin(x)   { return mathSin(x); }
+    public fn cos(x)   { return mathCos(x); }
+    public fn tan(x)   { return mathTan(x); }
+    
+    public fn asin(x)  { return mathAsin(x); }
+    public fn acos(x)  { return mathAcos(x); }
+    public fn atan(x)  { return mathAtan(x); }
+    public fn atan2(y, x) { return mathAtan2(y, x); }
+
+    // Conversion helpers
+    public fn radians(deg) { return deg * (PI / 180.0); }
+    public fn degrees(rad) { return rad * (180.0 / PI); }
+
+    // ── Logarithms and Exponentials ─────────────────────────────────────────
+    
+    // Returns e^x
+    public fn exp(x)   { return mathExp(x); }
+    
+    // Returns the natural logarithm (base e) of x
+    public fn log(x)   { return mathLog(x); }
+    
+    // Returns the base-10 logarithm of x
+    public fn log10(x) { return mathLog10(x); }
+    
+    // Returns the logarithm of x with a custom base
+    public fn logBase(x, base) {
+        return mathLog(x) / mathLog(base);
+    }
+
+    // ── Utility ─────────────────────────────────────────────────────────────
+    
+    // Linearly interpolates between a and b by t
+    public fn lerp(a, b, t) {
+        return a + (b - a) * t;
+    }
+
+    // Clamps x between min and max
+    public fn clamp(x, minVal, maxVal) {
+        if (x < minVal) { return minVal; }
+        if (x > maxVal) { return maxVal; }
+        return x;
+    }
+
+    // Bitwise and shift operations (can be used via operators or these funcs)
+    public fn lshift(val, n) { return val << n; }
+    public fn rshift(val, n) { return val >> n; }
+    public fn bitAnd(a, b)   { return a & b; }
+    public fn bitOr(a, b)    { return a | b; }
+    public fn bitXor(a, b)   { return a ^ b; }
+    public fn bitNot(a)      { return ~a; }
+}

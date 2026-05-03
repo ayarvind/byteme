@@ -33,9 +33,14 @@ var precedences = map[token.TokenType]int{
 	token.GTE:      LESSGREATER,
 	token.PLUS:     SUM,
 	token.MINUS:    SUM,
+	token.BIT_OR:   SUM,
+	token.BIT_XOR:  SUM,
 	token.SLASH:    PRODUCT,
 	token.ASTERISK: PRODUCT,
 	token.MOD:      PRODUCT,
+	token.LSHIFT:   PRODUCT,
+	token.RSHIFT:   PRODUCT,
+	token.BIT_AND:  PRODUCT,
 	token.LPAREN:   CALL,
 	token.LBRACKET: INDEX,
 	token.DOT:      ACCESS,
@@ -49,6 +54,7 @@ func (p *Parser) registerParsers() {
 	p.registerPrefix(token.STRING, p.parseStringLiteral)
 	p.registerPrefix(token.BANG, p.parsePrefixExpression)
 	p.registerPrefix(token.MINUS, p.parsePrefixExpression)
+	p.registerPrefix(token.BIT_NOT, p.parsePrefixExpression)
 	p.registerPrefix(token.TRUE, p.parseBoolean)
 	p.registerPrefix(token.FALSE, p.parseBoolean)
 	p.registerPrefix(token.LPAREN, p.parseGroupedExpression)
@@ -66,6 +72,11 @@ func (p *Parser) registerParsers() {
 	p.registerInfix(token.SLASH, p.parseInfixExpression)
 	p.registerInfix(token.ASTERISK, p.parseInfixExpression)
 	p.registerInfix(token.MOD, p.parseInfixExpression)
+	p.registerInfix(token.LSHIFT, p.parseInfixExpression)
+	p.registerInfix(token.RSHIFT, p.parseInfixExpression)
+	p.registerInfix(token.BIT_AND, p.parseInfixExpression)
+	p.registerInfix(token.BIT_OR, p.parseInfixExpression)
+	p.registerInfix(token.BIT_XOR, p.parseInfixExpression)
 	p.registerInfix(token.EQ, p.parseInfixExpression)
 	p.registerInfix(token.NOT_EQ, p.parseInfixExpression)
 	p.registerInfix(token.LT, p.parseGenericCallExpression)
@@ -173,10 +184,19 @@ func (p *Parser) parseStatement() ast.Statement {
 	case token.THROW:
 		return p.parseThrowStatement()
 	case token.PUBLIC:
-		if p.peekTokenIs(token.NAMESPACE) {
+		p.nextToken() // consume 'public'
+		switch p.curToken.Type {
+		case token.NAMESPACE:
 			return p.parseNamespaceStatement(true)
+		case token.LET:
+			return p.parseLetStatement()
+		case token.CONST:
+			return p.parseConstStatement()
+		case token.FUNCTION:
+			return p.parseExpressionStatement() // Function literals are parsed as expressions
+		default:
+			return nil
 		}
-		return nil
 	case token.NAMESPACE:
 		return p.parseNamespaceStatement(false)
 	case token.STRUCT:
@@ -446,10 +466,6 @@ func (p *Parser) parseReturnStatement() *ast.ReturnStatement {
 }
 
 func (p *Parser) parseNamespaceStatement(isPublic bool) ast.Statement {
-	if isPublic {
-		p.nextToken() // skip 'public', cur is 'namespace'
-	}
-	
 	stmt := &ast.NamespaceLiteral{Token: p.curToken, IsPublic: isPublic}
 
 	if !p.expectPeek(token.IDENT) {

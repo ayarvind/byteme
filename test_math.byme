@@ -1,0 +1,21 @@
+import "math.byme"
+
+println("--- Math Module Test ---");
+
+println("PI:", Math.PI);
+println("E: ", Math.E);
+
+println("abs(-5):", Math.abs(-5));
+println("abs(3.14):", Math.abs(3.14));
+
+println("max(10, 20):", Math.max(10, 20));
+println("min(10, 20):", Math.min(10, 20));
+
+println("pow(2, 10):", Math.pow(2.0, 10));
+println("sqrt(16):", Math.sqrt(16.0));
+println("sqrt(2):", Math.sqrt(2.0));
+
+println("floor(3.7):", Math.floor(3.7));
+println("ceil(3.2):", Math.ceil(3.2));
+println("floor(-1.2):", Math.floor(-1.2));
+println("ceil(-1.2):", Math.ceil(-1.2));

@@ -90,6 +90,10 @@ func (l *Lexer) NextToken() token.Token {
 			ch := l.ch
 			l.readChar()
 			tok = token.Token{Type: token.LTE, Literal: string(ch) + string(l.ch), Line: startLine, Column: startColumn}
+		} else if l.peekChar() == '<' {
+			ch := l.ch
+			l.readChar()
+			tok = token.Token{Type: token.LSHIFT, Literal: string(ch) + string(l.ch), Line: startLine, Column: startColumn}
 		} else {
 			tok = l.newToken(token.LT, l.ch)
 		}
@@ -98,9 +102,21 @@ func (l *Lexer) NextToken() token.Token {
 			ch := l.ch
 			l.readChar()
 			tok = token.Token{Type: token.GTE, Literal: string(ch) + string(l.ch), Line: startLine, Column: startColumn}
+		} else if l.peekChar() == '>' {
+			ch := l.ch
+			l.readChar()
+			tok = token.Token{Type: token.RSHIFT, Literal: string(ch) + string(l.ch), Line: startLine, Column: startColumn}
 		} else {
 			tok = l.newToken(token.GT, l.ch)
 		}
+	case '&':
+		tok = l.newToken(token.BIT_AND, l.ch)
+	case '|':
+		tok = l.newToken(token.BIT_OR, l.ch)
+	case '^':
+		tok = l.newToken(token.BIT_XOR, l.ch)
+	case '~':
+		tok = l.newToken(token.BIT_NOT, l.ch)
 	case ';':
 		tok = l.newToken(token.SEMICOLON, l.ch)
 	case ':':
