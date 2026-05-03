@@ -5,6 +5,12 @@ import (
 	"encoding/json"
 	"time"
 	"os"
+	"io"
+	"crypto/sha256"
+	"crypto/md5"
+	"encoding/hex"
+	"regexp"
+	"path/filepath"
 )
 
 var Builtins = []*Builtin{
@@ -147,6 +153,295 @@ var Builtins = []*Builtin{
 			ch, ok := args[0].(*Channel)
 			if !ok { return &Error{Message: "first argument to recv must be a channel"} }
 			return <-ch.Value
+		},
+	},
+	{ // 15: envGet
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			key, ok := args[0].(*String)
+			if !ok { return NULL }
+			return &String{Value: os.Getenv(key.Value)}
+		},
+	},
+	{ // 16: envSet
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 { return NULL }
+			key, ok1 := args[0].(*String)
+			val, ok2 := args[1].(*String)
+			if !ok1 || !ok2 { return NULL }
+			os.Setenv(key.Value, val.Value)
+			return NULL
+		},
+	},
+	{ // 17: args
+		Fn: func(args ...Object) Object {
+			res := &Array{Elements: make([]Object, len(os.Args))}
+			for i, a := range os.Args {
+				res.Elements[i] = &String{Value: a}
+			}
+			return res
+		},
+	},
+	{ // 18: exit
+		Fn: func(args ...Object) Object {
+			code := 0
+			if len(args) == 1 {
+				if c, ok := args[0].(*Integer); ok {
+					code = int(c.Value)
+				}
+			}
+			os.Exit(code)
+			return NULL
+		},
+	},
+	{ // 19: sha256
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			input, ok := args[0].(*String)
+			if !ok { return NULL }
+			hash := sha256.Sum256([]byte(input.Value))
+			return &String{Value: hex.EncodeToString(hash[:])}
+		},
+	},
+	{ // 20: md5
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			input, ok := args[0].(*String)
+			if !ok { return NULL }
+			hash := md5.Sum([]byte(input.Value))
+			return &String{Value: hex.EncodeToString(hash[:])}
+		},
+	},
+	{ // 21: regexMatch
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 { return NULL }
+			pattern, ok1 := args[0].(*String)
+			text, ok2 := args[1].(*String)
+			if !ok1 || !ok2 { return NULL }
+			match, err := regexp.MatchString(pattern.Value, text.Value)
+			if err != nil { return &Error{Message: err.Error()} }
+			if match { return TRUE }
+			return FALSE
+		},
+	},
+	{ // 22: regexReplace
+		Fn: func(args ...Object) Object {
+			if len(args) != 3 { return NULL }
+			pattern, ok1 := args[0].(*String)
+			text, ok2 := args[1].(*String)
+			repl, ok3 := args[2].(*String)
+			if !ok1 || !ok2 || !ok3 { return NULL }
+			re, err := regexp.Compile(pattern.Value)
+			if err != nil { return &Error{Message: err.Error()} }
+			return &String{Value: re.ReplaceAllString(text.Value, repl.Value)}
+		},
+	},
+	{ // 23: osMkdir
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			path, ok := args[0].(*String)
+			if !ok { return NULL }
+			if err := os.MkdirAll(path.Value, 0755); err != nil { return &Error{Message: err.Error()} }
+			return NULL
+		},
+	},
+	{ // 24: osRmdir
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			path, ok := args[0].(*String)
+			if !ok { return NULL }
+			if err := os.Remove(path.Value); err != nil { return &Error{Message: err.Error()} }
+			return NULL
+		},
+	},
+	{ // 25: osRemove
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			path, ok := args[0].(*String)
+			if !ok { return NULL }
+			if err := os.Remove(path.Value); err != nil { return &Error{Message: err.Error()} }
+			return NULL
+		},
+	},
+	{ // 26: osRename
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 { return NULL }
+			old, ok1 := args[0].(*String)
+			newPath, ok2 := args[1].(*String)
+			if !ok1 || !ok2 { return NULL }
+			if err := os.Rename(old.Value, newPath.Value); err != nil { return &Error{Message: err.Error()} }
+			return NULL
+		},
+	},
+	{ // 27: osListdir
+		Fn: func(args ...Object) Object {
+			path := "."
+			if len(args) == 1 {
+				if p, ok := args[0].(*String); ok { path = p.Value }
+			}
+			entries, err := os.ReadDir(path)
+			if err != nil { return &Error{Message: err.Error()} }
+			res := &Array{Elements: make([]Object, len(entries))}
+			for i, e := range entries { res.Elements[i] = &String{Value: e.Name()} }
+			return res
+		},
+	},
+	{ // 28: osExists
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			path, ok := args[0].(*String)
+			if !ok { return NULL }
+			if _, err := os.Stat(path.Value); err == nil { return TRUE }
+			return FALSE
+		},
+	},
+	{ // 29: osIsdir
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			path, ok := args[0].(*String)
+			if !ok { return NULL }
+			info, err := os.Stat(path.Value)
+			if err == nil && info.IsDir() { return TRUE }
+			return FALSE
+		},
+	},
+	{ // 30: osIsfile
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			path, ok := args[0].(*String)
+			if !ok { return NULL }
+			info, err := os.Stat(path.Value)
+			if err == nil && !info.IsDir() { return TRUE }
+			return FALSE
+		},
+	},
+	{ // 31: osGetcwd
+		Fn: func(args ...Object) Object {
+			cwd, err := os.Getwd()
+			if err != nil { return &Error{Message: err.Error()} }
+			return &String{Value: cwd}
+		},
+	},
+	{ // 32: osChdir
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			path, ok := args[0].(*String)
+			if !ok { return NULL }
+			if err := os.Chdir(path.Value); err != nil { return &Error{Message: err.Error()} }
+			return NULL
+		},
+	},
+	{ // 33: osGetpid
+		Fn: func(args ...Object) Object {
+			return &Integer{Value: int64(os.Getpid())}
+		},
+	},
+	{ // 34: pathJoin
+		Fn: func(args ...Object) Object {
+			parts := make([]string, len(args))
+			for i, arg := range args {
+				if s, ok := arg.(*String); ok { parts[i] = s.Value }
+			}
+			return &String{Value: filepath.Join(parts...)}
+		},
+	},
+	{ // 35: pathBase
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			path, ok := args[0].(*String)
+			if !ok { return NULL }
+			return &String{Value: filepath.Base(path.Value)}
+		},
+	},
+	{ // 36: pathDir
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			path, ok := args[0].(*String)
+			if !ok { return NULL }
+			return &String{Value: filepath.Dir(path.Value)}
+		},
+	},
+	{ // 37: fileOpen
+		Fn: func(args ...Object) Object {
+			if len(args) < 1 { return &Error{Message: "fileOpen requires at least 1 argument"} }
+			path, ok := args[0].(*String)
+			if !ok { return &Error{Message: "fileOpen: path must be a string"} }
+			mode := "r"
+			if len(args) > 1 {
+				if m, ok := args[1].(*String); ok { mode = m.Value }
+			}
+			
+			var flag int
+			switch mode {
+			case "r":  flag = os.O_RDONLY
+			case "r+": flag = os.O_RDWR
+			case "w":  flag = os.O_WRONLY | os.O_CREATE | os.O_TRUNC
+			case "w+": flag = os.O_RDWR | os.O_CREATE | os.O_TRUNC
+			case "a":  flag = os.O_WRONLY | os.O_CREATE | os.O_APPEND
+			case "a+": flag = os.O_RDWR | os.O_CREATE | os.O_APPEND
+			default:   flag = os.O_RDONLY
+			}
+			
+			f, err := os.OpenFile(path.Value, flag, 0644)
+			if err != nil { return &Error{Message: err.Error()} }
+			return &FileHandle{File: f}
+		},
+	},
+	{ // 38: fileClose
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			handle, ok := args[0].(*FileHandle)
+			if !ok { return NULL }
+			handle.File.Close()
+			return NULL
+		},
+	},
+	{ // 39: fileRead
+		Fn: func(args ...Object) Object {
+			if len(args) < 1 { return NULL }
+			handle, ok := args[0].(*FileHandle)
+			if !ok { return NULL }
+			n := -1
+			if len(args) > 1 {
+				if iv, ok := args[1].(*Integer); ok { n = int(iv.Value) }
+			}
+			
+			if n == -1 {
+				content, err := io.ReadAll(handle.File)
+				if err != nil { return &Error{Message: err.Error()} }
+				return &String{Value: string(content)}
+			}
+			
+			buf := make([]byte, n)
+			count, err := handle.File.Read(buf)
+			if err != nil && err.Error() != "EOF" { return &Error{Message: err.Error()} }
+			return &String{Value: string(buf[:count])}
+		},
+	},
+	{ // 40: fileWrite
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 { return NULL }
+			handle, ok := args[0].(*FileHandle)
+			data, ok2 := args[1].(*String)
+			if !ok || !ok2 { return NULL }
+			count, err := handle.File.WriteString(data.Value)
+			if err != nil { return &Error{Message: err.Error()} }
+			return &Integer{Value: int64(count)}
+		},
+	},
+	{ // 41: fileSeek
+		Fn: func(args ...Object) Object {
+			if len(args) < 2 { return NULL }
+			handle, ok := args[0].(*FileHandle)
+			offset, ok2 := args[1].(*Integer)
+			if !ok || !ok2 { return NULL }
+			whence := 0
+			if len(args) > 2 {
+				if w, ok := args[2].(*Integer); ok { whence = int(w.Value) }
+			}
+			pos, err := handle.File.Seek(offset.Value, whence)
+			if err != nil { return &Error{Message: err.Error()} }
+			return &Integer{Value: pos}
 		},
 	},
 }

@@ -1,0 +1,3 @@
+Line 1: Initial content.
+Line 2: More content.
+Line 3: Appended line.

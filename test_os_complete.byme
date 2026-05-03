@@ -1,0 +1,39 @@
+// test_os_complete.byme
+println("=== OS Complete Module Test ===");
+
+let cwd = osGetcwd();
+println("Current Directory:", cwd);
+
+let testDir = pathJoin(cwd, "test_garbage");
+println("Creating directory:", testDir);
+osMkdir(testDir);
+
+let testFile = pathJoin(testDir, "hello.txt");
+println("Writing to file:", testFile);
+fileWrite(testFile, "Hello ByteMe OS!");
+
+println("File exists?", osExists(testFile));
+println("Is directory?", osIsdir(testDir));
+println("Is file?", osIsfile(testFile));
+
+let files = osListdir(testDir);
+println("Directory contents:", files);
+
+println("Renaming file...");
+let newFile = pathJoin(testDir, "renamed.txt");
+osRename(testFile, newFile);
+
+println("New file exists?", osExists(newFile));
+println("Old file exists?", osExists(testFile));
+
+println("PID:", osGetpid());
+println("Path Base:", pathBase(newFile));
+println("Path Dir:", pathDir(newFile));
+
+// Cleanup
+println("\nCleaning up...");
+osRemove(newFile);
+osRmdir(testDir);
+println("Cleanup done. Exists?", osExists(testDir));
+
+println("=== Test Complete ===");

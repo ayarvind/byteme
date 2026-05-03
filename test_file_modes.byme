@@ -1,0 +1,40 @@
+// test_file_modes.byme
+println("=== Advanced File Handling Test ===");
+
+let filename = "modes_test.txt";
+
+// 1. Write mode 'w'
+println("\n1. Writing with 'w' mode...");
+let fw = fOpen(filename, "w");
+fWrite(fw, "Line 1: Initial content.\n");
+fWrite(fw, "Line 2: More content.\n");
+fClose(fw);
+println("File written and closed.");
+
+// 2. Read mode 'r'
+println("\n2. Reading with 'r' mode...");
+let fr = fOpen(filename, "r");
+let content = fRead(fr);
+println("Full Content:\n" + content);
+fClose(fr);
+
+// 3. Partial Read
+println("\n3. Partial Read (first 10 bytes)...");
+let fr2 = fOpen(filename, "r");
+let partial = fRead(fr2, 10);
+println("Partial Content: [" + partial + "]");
+fClose(fr2);
+
+// 4. Append mode 'a'
+println("\n4. Appending with 'a' mode...");
+let fa = fOpen(filename, "a");
+fWrite(fa, "Line 3: Appended line.\n");
+fClose(fa);
+
+// 5. Verification
+println("\n5. Verifying final content...");
+let fv = fOpen(filename, "r");
+println(fRead(fv));
+fClose(fv);
+
+println("=== Test Complete ===");

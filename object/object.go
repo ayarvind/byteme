@@ -3,6 +3,7 @@ package object
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"github.com/byteme/compiler/ast"
 	"github.com/byteme/compiler/environment"
 )
@@ -181,3 +182,11 @@ type Error struct {
 func (e *Error) Type() ObjectType { return ERROR_OBJ }
 func (e *Error) Inspect() string  { return "ERROR: " + e.Message }
 func (e *Error) Error() string    { return e.Message }
+
+// FileHandle represents an open file
+type FileHandle struct {
+	File *os.File
+}
+func (f *FileHandle) Type() ObjectType { return "FILE_HANDLE" }
+func (f *FileHandle) Inspect() string  { return fmt.Sprintf("FileHandle[%p]", f.File) }
+

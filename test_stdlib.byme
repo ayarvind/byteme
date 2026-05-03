@@ -1,0 +1,28 @@
+// test_stdlib.byme
+println("=== Standard Library Expansion Test ===");
+
+// 1. OS
+println("\n1. OS Tests");
+envSet("BYTEME_VAL", "awesome");
+println("Env BYTEME_VAL:", envGet("BYTEME_VAL"));
+let cmdArgs = args();
+println("Command line args length:", len(cmdArgs));
+
+// 2. Crypto
+println("\n2. Crypto Tests");
+let secret = "ByteMeSecret";
+println("SHA256 of 'ByteMeSecret':", sha256(secret));
+println("MD5    of 'ByteMeSecret':", md5(secret));
+
+// 3. Regex
+println("\n3. Regex Tests");
+let pattern = "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$";
+let email = "test@byteme.org";
+let isEmail = regexMatch(pattern, email);
+println("Is '" + email + "' a valid email?", isEmail);
+
+let text = "The quick brown fox jumps over the lazy dog";
+let replaced = regexReplace("fox", text, "cat");
+println("Replaced 'fox' with 'cat':", replaced);
+
+println("\n=== Test Complete ===");

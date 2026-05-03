@@ -449,16 +449,30 @@ func isTruthy(obj object.Object) bool {
 func (vm *VM) executeBinaryArithmetic(op code.Opcode) error {
 	right := vm.pop()
 	left := vm.pop()
-	leftValue := left.(*object.Integer).Value
-	rightValue := right.(*object.Integer).Value
-	var result int64
-	switch op {
-	case code.OpAdd: result = leftValue + rightValue
-	case code.OpSub: result = leftValue - rightValue
-	case code.OpMul: result = leftValue * rightValue
-	case code.OpDiv: result = leftValue / rightValue
+
+	if left.Type() == object.STRING_OBJ && right.Type() == object.STRING_OBJ {
+		if op != code.OpAdd {
+			return fmt.Errorf("unknown operator %d for strings", op)
+		}
+		leftVal := left.(*object.String).Value
+		rightVal := right.(*object.String).Value
+		return vm.push(&object.String{Value: leftVal + rightVal})
 	}
-	return vm.push(&object.Integer{Value: result})
+
+	if left.Type() == object.INTEGER_OBJ && right.Type() == object.INTEGER_OBJ {
+		leftValue := left.(*object.Integer).Value
+		rightValue := right.(*object.Integer).Value
+		var result int64
+		switch op {
+		case code.OpAdd: result = leftValue + rightValue
+		case code.OpSub: result = leftValue - rightValue
+		case code.OpMul: result = leftValue * rightValue
+		case code.OpDiv: result = leftValue / rightValue
+		}
+		return vm.push(&object.Integer{Value: result})
+	}
+
+	return fmt.Errorf("unsupported types for binary operation: %s and %s", left.Type(), right.Type())
 }
 
 func (vm *VM) executeComparison(op code.Opcode) error {
