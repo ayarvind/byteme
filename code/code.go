@@ -54,6 +54,8 @@ const (
 	OpTry        // operand: 2-byte jump destination for catch block
 	OpEndTry
 	OpAwait
+	OpIndex
+	OpSetIndex
 )
 
 type Definition struct {
@@ -105,6 +107,8 @@ var definitions = map[Opcode]*Definition{
 	OpTry:           {"OpTry", []int{2}},
 	OpEndTry:        {"OpEndTry", []int{}},
 	OpAwait:         {"OpAwait", []int{}},
+	OpIndex:         {"OpIndex", []int{}},
+	OpSetIndex:      {"OpSetIndex", []int{}},
 }
 
 func Lookup(op byte) (*Definition, error) {

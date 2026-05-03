@@ -194,6 +194,8 @@ func (p *Parser) parseStatement() ast.Statement {
 			return p.parseConstStatement()
 		case token.FUNCTION:
 			return p.parseExpressionStatement() // Function literals are parsed as expressions
+		case token.STRUCT:
+			return p.parseStructStatement()
 		default:
 			return nil
 		}

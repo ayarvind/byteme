@@ -183,6 +183,18 @@ func (c *Compiler) Compile(node ast.Node) error {
 					}
 				}
 				return fmt.Errorf("invalid assignment target")
+			case *ast.IndexExpression: // Array access like `arr[0] = ...`
+				err := c.Compile(left.Left) // Push the array FIRST
+				if err != nil { return err }
+				
+				err = c.Compile(left.Index) // Push the index SECOND
+				if err != nil { return err }
+				
+				err = c.Compile(n.Right) // Push the value THIRD
+				if err != nil { return err }
+				
+				c.emit(code.OpSetIndex)
+				return nil
 			default:
 				return fmt.Errorf("invalid assignment target")
 			}
@@ -571,7 +583,33 @@ func (c *Compiler) Compile(node ast.Node) error {
 			c.emit(code.OpSetLocal, symbol.Index)
 		}
 
-		// Compile each function/var in the body under "NamespaceName.memberName"
+		// Pass 1: Define all names in the symbol table
+		for _, stmt := range n.Body.Statements {
+			switch s := stmt.(type) {
+			case *ast.LetStatement:
+				compoundName := nsName + "." + s.Name.Value
+				sym := c.symbolTable.Define(compoundName)
+				aliasSym := sym
+				aliasSym.Name = s.Name.Value
+				c.symbolTable.store[s.Name.Value] = aliasSym
+			case *ast.ExpressionStatement:
+				if fnLit, ok := s.Expression.(*ast.FunctionLiteral); ok && fnLit.Name != nil {
+					compoundName := nsName + "." + fnLit.Name.Value
+					sym := c.symbolTable.Define(compoundName)
+					aliasSym := sym
+					aliasSym.Name = fnLit.Name.Value
+					c.symbolTable.store[fnLit.Name.Value] = aliasSym
+				} else if structLit, ok := s.Expression.(*ast.StructLiteral); ok && structLit.Name != nil {
+					compoundName := nsName + "." + structLit.Name.Value
+					sym := c.symbolTable.Define(compoundName)
+					aliasSym := sym
+					aliasSym.Name = structLit.Name.Value
+					c.symbolTable.store[structLit.Name.Value] = aliasSym
+				}
+			}
+		}
+
+		// Pass 2: Compile bodies
 		for _, stmt := range n.Body.Statements {
 			switch s := stmt.(type) {
 			case *ast.LetStatement:
@@ -579,30 +617,17 @@ func (c *Compiler) Compile(node ast.Node) error {
 				err := c.Compile(s.Value)
 				if err != nil { return err }
 				
-				sym := c.symbolTable.Define(compoundName)
+				sym, _ := c.symbolTable.Resolve(compoundName)
 				if sym.Scope == GlobalScope {
 					c.emit(code.OpSetGlobal, sym.Index)
 				} else {
 					c.emit(code.OpSetLocal, sym.Index)
 				}
-				
-				// Alias for internal usage
-				aliasSym := sym
-				aliasSym.Name = s.Name.Value
-				c.symbolTable.store[s.Name.Value] = aliasSym
 
 			case *ast.ExpressionStatement:
 				if fnLit, ok := s.Expression.(*ast.FunctionLiteral); ok && fnLit.Name != nil {
 					compoundName := nsName + "." + fnLit.Name.Value
 					
-					// Define names in symbol table BEFORE compiling body to allow recursion
-					sym := c.symbolTable.Define(compoundName)
-					
-					// Alias for internal usage
-					aliasSym := sym
-					aliasSym.Name = fnLit.Name.Value
-					c.symbolTable.store[fnLit.Name.Value] = aliasSym
-
 					enclosedCompiler := NewEnclosedCompiler(c)
 					for _, p := range fnLit.Parameters {
 						enclosedCompiler.symbolTable.Define(p.Name.Value)
@@ -619,7 +644,26 @@ func (c *Compiler) Compile(node ast.Node) error {
 					}
 					c.emit(code.OpConstant, c.addConstant(compiledFn))
 					
-					// Use the previously defined sym
+					sym, _ := c.symbolTable.Resolve(compoundName)
+					if sym.Scope == GlobalScope {
+						c.emit(code.OpSetGlobal, sym.Index)
+					} else {
+						c.emit(code.OpSetLocal, sym.Index)
+					}
+				} else if structLit, ok := s.Expression.(*ast.StructLiteral); ok && structLit.Name != nil {
+					compoundName := nsName + "." + structLit.Name.Value
+					
+					// Handle StructLiteral: Build object.StructLiteral and Emit OpStructDef
+					fields := make([]*ast.Parameter, len(structLit.Fields))
+					copy(fields, structLit.Fields)
+					structDef := &object.StructLiteral{
+						Name:   structLit.Name.Value,
+						Fields: fields,
+					}
+					constIdx := c.addConstant(structDef)
+					c.emit(code.OpStructDef, constIdx)
+					
+					sym, _ := c.symbolTable.Resolve(compoundName)
 					if sym.Scope == GlobalScope {
 						c.emit(code.OpSetGlobal, sym.Index)
 					} else {
@@ -645,6 +689,13 @@ func (c *Compiler) Compile(node ast.Node) error {
 		err := c.Compile(n.Expression)
 		if err != nil { return err }
 		c.emit(code.OpAwait)
+
+	case *ast.IndexExpression:
+		err := c.Compile(n.Left)
+		if err != nil { return err }
+		err = c.Compile(n.Index)
+		if err != nil { return err }
+		c.emit(code.OpIndex)
 	}
 
 	return nil
@@ -713,11 +764,37 @@ var builtins = map[string]int{
 	"mathAbs":      59,
 	"mathCeil":     60,
 	"mathFloor":    61,
-	"httpHandle":   62,
-	"httpServe":    63,
-	"httpGet":      64,
-	"httpPost":     65,
-	"httpResponse": 66,
+	"strToLower":   62,
+	"strToUpper":   63,
+	"strTrim":      64,
+	"strTrimSpace": 65,
+	"strSplit":     66,
+	"strJoin":      67,
+	"strContains":  68,
+	"strHasPrefix": 69,
+	"strHasSuffix": 70,
+	"strIndex":     71,
+	"strLastIndex": 72,
+	"strReplace":   73,
+	"strRepeat":    74,
+	"strCount":     75,
+	"strFields":    76,
+	"strTrimLeft":  77,
+	"strTrimRight": 78,
+	"strIsAlpha":   79,
+	"strIsDigit":   80,
+	"strIsSpace":   81,
+	"strReverse":   82,
+	"ioReadInput":  83,
+	"arrayPush":    84,
+	"arrayPop":     85,
+	"arraySlice":    86,
+	"arraySort":    87,
+	"httpHandle":   88,
+	"httpServe":    89,
+	"httpGet":      90,
+	"httpPost":     91,
+	"httpResponse": 92,
 }
 
 func (c *Compiler) Bytecode() *Bytecode {

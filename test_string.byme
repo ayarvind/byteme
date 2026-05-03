@@ -1,0 +1,36 @@
+import "lib/string.byme"
+
+println("=== ByteMe Extended String Module Test ===");
+
+let s = "  hello, ByteMe World!  ";
+let trimmed = String.trimSpace(s);
+
+println("\n1. Advanced Manipulation:");
+println("   Reverse      : '" + String.reverse(trimmed) + "'");
+println("   Capitalize   : '" + String.capitalize("byteme") + "'");
+println("   Repeat '!' 5 : '" + String.repeat("!", 5) + "'");
+
+println("\n2. Directional Trimming:");
+let messy = "<<<data>>>";
+println("   Original  : " + messy);
+println("   trimLeft  : " + String.trimLeft(messy, "<"));
+println("   trimRight : " + String.trimRight(messy, ">"));
+
+println("\n3. Counting & Fields:");
+let sentence = "one two one three one";
+println("   Sentence   : " + sentence);
+println("   count 'one': " + String.count(sentence, "one"));
+println("   fields     : ", String.fields(sentence));
+
+println("\n4. Padding:");
+let n = "42";
+println("   padLeft(5, '0')  : '" + String.padLeft(n, 5, "0") + "'");
+println("   padRight(5, '.') : '" + String.padRight(n, 5, ".") + "'");
+
+println("\n5. Checks:");
+println("   isAlpha('ABC')   :", String.isAlpha("ABC"));
+println("   isAlpha('123')   :", String.isAlpha("123"));
+println("   isDigit('123')   :", String.isDigit("123"));
+println("   isSpace('  \t\n') :", String.isSpace("  \t\n"));
+
+println("\n=== Test Complete ===");

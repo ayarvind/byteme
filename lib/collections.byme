@@ -1,0 +1,82 @@
+// ByteMe Standard Library: Collections
+// Provides data structures like List (Vector), Stack, and Queue.
+
+public namespace Collections {
+
+    // ── List (Dynamic Array / Vector) ──────────────────────────────────────
+    public struct List {
+        items: any
+    }
+
+    public fn newList() {
+        return List([]);
+    }
+
+    public fn add(list: List, item) {
+        arrayPush(list.items, item);
+    }
+
+    public fn get(list: List, index) {
+        return list.items[index];
+    }
+
+    public fn size(list: List) {
+        return len(list.items);
+    }
+
+    public fn clear(list: List) {
+        list.items = [];
+    }
+
+    // ── Stack (LIFO) ────────────────────────────────────────────────────────
+    public struct Stack {
+        items: any
+    }
+
+    public fn newStack() {
+        return Stack([]);
+    }
+
+    public fn push(s: Stack, item) {
+        arrayPush(s.items, item);
+    }
+
+    public fn pop(s: Stack) {
+        return arrayPop(s.items);
+    }
+
+    public fn peek(s: Stack) {
+        let n = len(s.items);
+        if (n == 0) { return null; }
+        return s.items[n-1];
+    }
+
+    public fn isEmpty(s: Stack) {
+        return len(s.items) == 0;
+    }
+
+    // ── Queue (FIFO) ────────────────────────────────────────────────────────
+    public struct Queue {
+        items: any
+    }
+
+    public fn newQueue() {
+        return Queue([]);
+    }
+
+    public fn enqueue(q: Queue, item) {
+        arrayPush(q.items, item);
+    }
+
+    public fn dequeue(q: Queue) {
+        if (len(q.items) == 0) { return null; }
+        let item = q.items[0];
+        q.items = arraySlice(q.items, 1, len(q.items));
+        return item;
+    }
+
+    public fn peekQueue(q: Queue) {
+        if (len(q.items) == 0) { return null; }
+        return q.items[0];
+    }
+}

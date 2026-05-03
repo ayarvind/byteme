@@ -462,6 +462,52 @@ func (vm *VM) Run() error {
 			if len(vm.catchHandlers) > 0 {
 				vm.catchHandlers = vm.catchHandlers[:len(vm.catchHandlers)-1]
 			}
+
+		case code.OpIndex:
+			index := vm.pop()
+			left := vm.pop()
+			switch obj := left.(type) {
+			case *object.Array:
+				idx := index.(*object.Integer).Value
+				if idx < 0 || idx >= int64(len(obj.Elements)) {
+					vm.push(object.NULL)
+				} else {
+					vm.push(obj.Elements[idx])
+				}
+			case *object.Map:
+				key := index.Inspect()
+				val, ok := obj.Pairs[key]
+				if !ok { vm.push(object.NULL) } else { vm.push(val) }
+			case *object.String:
+				idx := index.(*object.Integer).Value
+				if idx < 0 || idx >= int64(len(obj.Value)) {
+					vm.push(object.NULL)
+				} else {
+					vm.push(&object.String{Value: string(obj.Value[idx])})
+				}
+			default:
+				return fmt.Errorf("index operator not supported: %s", left.Type())
+			}
+
+		case code.OpSetIndex:
+			value := vm.pop()
+			index := vm.pop()
+			left := vm.pop()
+			switch obj := left.(type) {
+			case *object.Array:
+				idx := index.(*object.Integer).Value
+				if idx < 0 || idx >= int64(len(obj.Elements)) {
+					return fmt.Errorf("index out of range: %d", idx)
+				}
+				obj.Elements[idx] = value
+				vm.push(obj)
+			case *object.Map:
+				key := index.Inspect()
+				obj.Pairs[key] = value
+				vm.push(obj)
+			default:
+				return fmt.Errorf("index assignment not supported: %s", left.Type())
+			}
 		}
 	}
 	return nil

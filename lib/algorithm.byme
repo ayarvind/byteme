@@ -1,0 +1,63 @@
+// ByteMe Standard Library: Algorithm
+// Provides common algorithms like sorting and searching.
+
+public namespace Algorithm {
+
+    // Sorts an array in-place
+    public fn sort(arr) {
+        return arraySort(arr);
+    }
+
+    // Returns a new sorted array
+    public fn sorted(arr) {
+        let newArr = arraySlice(arr, 0, len(arr));
+        return arraySort(newArr);
+    }
+
+    // Performs a linear search, returns index or -1
+    public fn find(arr, target) {
+        let i = 0;
+        let n = len(arr);
+        while (i < n) {
+            if (arr[i] == target) {
+                return i;
+            }
+            i = i + 1;
+        }
+        return -1;
+    }
+
+
+    public fn contains(arr, target) {
+        return find(arr, target) != -1;
+    }
+
+    // Reverses an array in-place
+    public fn reverse(arr) {
+        let i = 0;
+        let j = len(arr) - 1;
+        while (i < j) {
+            let temp = arr[i];
+            arr[i] = arr[j];
+            arr[j] = temp;
+            i = i + 1;
+            j = j - 1;
+        }
+        return arr;
+    }
+
+
+    // Counts occurrences of target in arr
+    public fn count(arr, target) {
+        let c = 0;
+        let i = 0;
+        let n = len(arr);
+        while (i < n) {
+            if (arr[i] == target) {
+                c = c + 1;
+            }
+            i = i + 1;
+        }
+        return c;
+    }
+}

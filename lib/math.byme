@@ -87,6 +87,24 @@ public namespace Math {
         return x;
     }
 
+    // Greatest Common Divisor
+    public fn gcd(a, b) {
+        let x = abs(a);
+        let y = abs(b);
+        while (y != 0) {
+            let temp = y;
+            y = x % y;
+            x = temp;
+        }
+        return x;
+    }
+
+    // Least Common Multiple
+    public fn lcm(a, b) {
+        if (a == 0 | b == 0) { return 0; }
+        return abs(a * b) / gcd(a, b);
+    }
+
     // Bitwise and shift operations (can be used via operators or these funcs)
     public fn lshift(val, n) { return val << n; }
     public fn rshift(val, n) { return val >> n; }

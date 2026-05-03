@@ -1,0 +1,148 @@
+// ByteMe Standard Library: String
+// This module provides common string manipulation functions.
+
+public namespace String {
+    // Returns the string in all lowercase
+    public fn toLower(s) { return strToLower(s); }
+
+    // Returns the string in all uppercase
+    public fn toUpper(s) { return strToUpper(s); }
+
+    // Returns a slice of the string with all leading and trailing 
+    // characters contained in cutset removed.
+    public fn trim(s, cutset) { return strTrim(s, cutset); }
+
+    // Returns a slice of the string with all leading characters 
+    // contained in cutset removed.
+    public fn trimLeft(s, cutset) { return strTrimLeft(s, cutset); }
+
+    // Returns a slice of the string with all trailing characters 
+    // contained in cutset removed.
+    public fn trimRight(s, cutset) { return strTrimRight(s, cutset); }
+
+    // Returns a slice of the string with all leading and trailing 
+    // white space removed.
+    public fn trimSpace(s) { return strTrimSpace(s); }
+
+    // Slices s into all substrings separated by sep and returns a list 
+    // of the substrings between those separators.
+    public fn split(s, sep) { return strSplit(s, sep); }
+
+    // Splits the string s around each instance of one or more consecutive 
+    // white space characters.
+    public fn fields(s) { return strFields(s); }
+
+    // Concatenates the elements of its first argument to create a single string. 
+    // The separator string sep is placed between elements in the resulting string.
+    public fn join(arr, sep) { return strJoin(arr, sep); }
+
+    // Reports whether substr is within s.
+    public fn contains(s, substr) { return strContains(s, substr); }
+
+    // Tests whether the string s begins with prefix.
+    public fn hasPrefix(s, prefix) { return strHasPrefix(s, prefix); }
+    public fn startsWith(s, prefix) { return strHasPrefix(s, prefix); }
+
+    // Tests whether the string s ends with suffix.
+    public fn hasSuffix(s, suffix) { return strHasSuffix(s, suffix); }
+    public fn endsWith(s, suffix) { return strHasSuffix(s, suffix); }
+
+    // Returns the index of the first instance of substr in s, or -1 if substr is not present in s.
+    public fn indexOf(s, substr) { return strIndex(s, substr); }
+
+    // Returns the index of the last instance of substr in s, or -1 if substr is not present in s.
+    public fn lastIndexOf(s, substr) { return strLastIndex(s, substr); }
+
+    // Returns the number of non-overlapping instances of substr in s.
+    public fn count(s, substr) { return strCount(s, substr); }
+
+    // Returns a copy of the string s with the first n non-overlapping instances of old replaced by new.
+    // If n < 0, there is no limit on the number of replacements.
+    public fn replace(s, old, new, n) { return strReplace(s, old, new, n); }
+
+    // Returns a copy of the string s with all non-overlapping instances of old replaced by new.
+    public fn replaceAll(s, old, new) { return strReplace(s, old, new, -1); }
+
+    // Returns a new string consisting of n copies of s.
+    public fn repeat(s, n) { return strRepeat(s, n); }
+
+    // Returns a new string with characters in reverse order.
+    public fn reverse(s) {
+        return strReverse(s);
+    }
+
+    public fn padLeft(s, length, padChar) {
+        if (len(s) >= length) { return s; }
+        let padding = "";
+        let n = length - len(s);
+        let i = 0;
+        while (i < n) {
+            padding = padding + padChar;
+            i = i + 1;
+        }
+        return padding + s;
+    }
+
+    public fn padRight(s, length, padChar) {
+        if (len(s) >= length) { return s; }
+        let padding = "";
+        let n = length - len(s);
+        let i = 0;
+        while (i < n) {
+            padding = padding + padChar;
+            i = i + 1;
+        }
+        return s + padding;
+    }
+
+    // Capitalizes the first letter of the string.
+    public fn capitalize(s) {
+        if (len(s) == 0) { return s; }
+        return strToUpper(charAt(s, 0)) + substring(s, 1, len(s));
+    }
+
+    // Returns true if all characters in the string are alphabetic.
+    public fn isAlpha(s) { return strIsAlpha(s); }
+
+    // Returns true if all characters in the string are digits.
+    public fn isDigit(s) { return strIsDigit(s); }
+
+    // Returns true if all characters in the string are whitespace.
+    public fn isSpace(s) { return strIsSpace(s); }
+
+    // Pads the string with padChar on the left until it reaches length n.
+    public fn padLeft(s, n, padChar) {
+        let diff = n - len(s);
+        if (diff <= 0) { return s; }
+        return strRepeat(padChar, diff) + s;
+    }
+
+    // Pads the string with padChar on the right until it reaches length n.
+    public fn padRight(s, n, padChar) {
+        let diff = n - len(s);
+        if (diff <= 0) { return s; }
+        return s + strRepeat(padChar, diff);
+    }
+
+    // Returns the length of the string
+    public fn len(s) { return len(s); }
+
+    // Returns the character at the specified index
+    public fn charAt(s, i) { return charAt(s, i); }
+
+    // Returns a substring of s from start up to (but not including) end.
+    public fn substring(s, start, end) {
+        if (start < 0) { start = 0; }
+        if (end > len(s)) { end = len(s); }
+        if (start >= end) { return ""; }
+        
+        // Use optimized slice if possible, but for now loop is safe
+        let res = "";
+        let i = start;
+        while (i < end) {
+            res = res + charAt(s, i);
+            i = i + 1;
+        }
+        return res;
+    }
+}

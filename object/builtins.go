@@ -12,6 +12,10 @@ import (
 	"regexp"
 	"path/filepath"
 	"math"
+	"strings"
+	"unicode"
+	"bufio"
+	"sort"
 )
 
 var Builtins = []*Builtin{
@@ -643,6 +647,297 @@ var Builtins = []*Builtin{
 			val := 0.0
 			if f, ok := args[0].(*Float); ok { val = f.Value } else if i, ok := args[0].(*Integer); ok { return i }
 			return &Float{Value: math.Floor(val)}
+		},
+	},
+	{ // 62: strToLower
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			s, ok := args[0].(*String)
+			if !ok { return NULL }
+			return &String{Value: strings.ToLower(s.Value)}
+		},
+	},
+	{ // 63: strToUpper
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			s, ok := args[0].(*String)
+			if !ok { return NULL }
+			return &String{Value: strings.ToUpper(s.Value)}
+		},
+	},
+	{ // 64: strTrim
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 { return NULL }
+			s, ok1 := args[0].(*String)
+			cutset, ok2 := args[1].(*String)
+			if !ok1 || !ok2 { return NULL }
+			return &String{Value: strings.Trim(s.Value, cutset.Value)}
+		},
+	},
+	{ // 65: strTrimSpace
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			s, ok := args[0].(*String)
+			if !ok { return NULL }
+			return &String{Value: strings.TrimSpace(s.Value)}
+		},
+	},
+	{ // 66: strSplit
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 { return NULL }
+			s, ok1 := args[0].(*String)
+			sep, ok2 := args[1].(*String)
+			if !ok1 || !ok2 { return NULL }
+			res := strings.Split(s.Value, sep.Value)
+			elements := make([]Object, len(res))
+			for i, str := range res {
+				elements[i] = &String{Value: str}
+			}
+			return &Array{Elements: elements}
+		},
+	},
+	{ // 67: strJoin
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 { return NULL }
+			arr, ok1 := args[0].(*Array)
+			sep, ok2 := args[1].(*String)
+			if !ok1 || !ok2 { return NULL }
+			res := make([]string, len(arr.Elements))
+			for i, e := range arr.Elements {
+				res[i] = e.Inspect()
+			}
+			return &String{Value: strings.Join(res, sep.Value)}
+		},
+	},
+	{ // 68: strContains
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 { return NULL }
+			s, ok1 := args[0].(*String)
+			sub, ok2 := args[1].(*String)
+			if !ok1 || !ok2 { return NULL }
+			if strings.Contains(s.Value, sub.Value) {
+				return TRUE
+			}
+			return FALSE
+		},
+	},
+	{ // 69: strHasPrefix
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 { return NULL }
+			s, ok1 := args[0].(*String)
+			pre, ok2 := args[1].(*String)
+			if !ok1 || !ok2 { return NULL }
+			if strings.HasPrefix(s.Value, pre.Value) {
+				return TRUE
+			}
+			return FALSE
+		},
+	},
+	{ // 70: strHasSuffix
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 { return NULL }
+			s, ok1 := args[0].(*String)
+			suf, ok2 := args[1].(*String)
+			if !ok1 || !ok2 { return NULL }
+			if strings.HasSuffix(s.Value, suf.Value) {
+				return TRUE
+			}
+			return FALSE
+		},
+	},
+	{ // 71: strIndex
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 { return NULL }
+			s, ok1 := args[0].(*String)
+			sub, ok2 := args[1].(*String)
+			if !ok1 || !ok2 { return NULL }
+			return &Integer{Value: int64(strings.Index(s.Value, sub.Value))}
+		},
+	},
+	{ // 72: strLastIndex
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 { return NULL }
+			s, ok1 := args[0].(*String)
+			sub, ok2 := args[1].(*String)
+			if !ok1 || !ok2 { return NULL }
+			return &Integer{Value: int64(strings.LastIndex(s.Value, sub.Value))}
+		},
+	},
+	{ // 73: strReplace
+		Fn: func(args ...Object) Object {
+			if len(args) != 4 { return NULL }
+			s, ok1 := args[0].(*String)
+			old, ok2 := args[1].(*String)
+			new, ok3 := args[2].(*String)
+			n, ok4 := args[3].(*Integer)
+			if !ok1 || !ok2 || !ok3 || !ok4 { return NULL }
+			return &String{Value: strings.Replace(s.Value, old.Value, new.Value, int(n.Value))}
+		},
+	},
+	{ // 74: strRepeat
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 { return NULL }
+			s, ok1 := args[0].(*String)
+			n, ok2 := args[1].(*Integer)
+			if !ok1 || !ok2 { return NULL }
+			return &String{Value: strings.Repeat(s.Value, int(n.Value))}
+		},
+	},
+	{ // 75: strCount
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 { return NULL }
+			s, ok1 := args[0].(*String)
+			sub, ok2 := args[1].(*String)
+			if !ok1 || !ok2 { return NULL }
+			return &Integer{Value: int64(strings.Count(s.Value, sub.Value))}
+		},
+	},
+	{ // 76: strFields
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			s, ok := args[0].(*String)
+			if !ok { return NULL }
+			res := strings.Fields(s.Value)
+			elements := make([]Object, len(res))
+			for i, str := range res {
+				elements[i] = &String{Value: str}
+			}
+			return &Array{Elements: elements}
+		},
+	},
+	{ // 77: strTrimLeft
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 { return NULL }
+			s, ok1 := args[0].(*String)
+			cutset, ok2 := args[1].(*String)
+			if !ok1 || !ok2 { return NULL }
+			return &String{Value: strings.TrimLeft(s.Value, cutset.Value)}
+		},
+	},
+	{ // 78: strTrimRight
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 { return NULL }
+			s, ok1 := args[0].(*String)
+			cutset, ok2 := args[1].(*String)
+			if !ok1 || !ok2 { return NULL }
+			return &String{Value: strings.TrimRight(s.Value, cutset.Value)}
+		},
+	},
+	{ // 79: strIsAlpha
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			s, ok := args[0].(*String)
+			if !ok { return NULL }
+			if s.Value == "" { return FALSE }
+			for _, r := range s.Value {
+				if !unicode.IsLetter(r) { return FALSE }
+			}
+			return TRUE
+		},
+	},
+	{ // 80: strIsDigit
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			s, ok := args[0].(*String)
+			if !ok { return NULL }
+			if s.Value == "" { return FALSE }
+			for _, r := range s.Value {
+				if !unicode.IsDigit(r) { return FALSE }
+			}
+			return TRUE
+		},
+	},
+	{ // 81: strIsSpace
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			s, ok := args[0].(*String)
+			if !ok { return NULL }
+			if s.Value == "" { return FALSE }
+			for _, r := range s.Value {
+				if !unicode.IsSpace(r) { return FALSE }
+			}
+			return TRUE
+		},
+	},
+	{ // 82: strReverse
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			s, ok := args[0].(*String)
+			if !ok { return NULL }
+			runes := []rune(s.Value)
+			for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
+				runes[i], runes[j] = runes[j], runes[i]
+			}
+			return &String{Value: string(runes)}
+		},
+	},
+	{ // 83: ioReadInput
+		Fn: func(args ...Object) Object {
+			if len(args) == 1 {
+				if prompt, ok := args[0].(*String); ok {
+					fmt.Print(prompt.Value)
+				}
+			}
+			reader := bufio.NewReader(os.Stdin)
+			text, _ := reader.ReadString('\n')
+			return &String{Value: strings.TrimRight(text, "\r\n")}
+		},
+	},
+	{ // 84: arrayPush
+		Fn: func(args ...Object) Object {
+			if len(args) < 2 { return NULL }
+			arr, ok := args[0].(*Array)
+			if !ok { return &Error{Message: "first argument to push must be an array"} }
+			arr.Elements = append(arr.Elements, args[1:]...)
+			return arr
+		},
+	},
+	{ // 85: arrayPop
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			arr, ok := args[0].(*Array)
+			if !ok { return &Error{Message: "argument to pop must be an array"} }
+			if len(arr.Elements) == 0 { return NULL }
+			last := arr.Elements[len(arr.Elements)-1]
+			arr.Elements = arr.Elements[:len(arr.Elements)-1]
+			return last
+		},
+	},
+	{ // 86: arraySlice
+		Fn: func(args ...Object) Object {
+			if len(args) < 2 { return NULL }
+			arr, ok := args[0].(*Array)
+			if !ok { return NULL }
+			start, ok1 := args[1].(*Integer)
+			if !ok1 { return NULL }
+			
+			end := int64(len(arr.Elements))
+			if len(args) == 3 {
+				if e, ok2 := args[2].(*Integer); ok2 {
+					end = e.Value
+				}
+			}
+			
+			if start.Value < 0 || end > int64(len(arr.Elements)) || start.Value > end {
+				return &Array{Elements: []Object{}}
+			}
+			
+			newElements := make([]Object, end-start.Value)
+			copy(newElements, arr.Elements[start.Value:end])
+			return &Array{Elements: newElements}
+		},
+	},
+	{ // 87: arraySort
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			arr, ok := args[0].(*Array)
+			if !ok { return NULL }
+			
+			sort.Slice(arr.Elements, func(i, j int) bool {
+				// Simple lexicographical sort based on Inspect() for now
+				return arr.Elements[i].Inspect() < arr.Elements[j].Inspect()
+			})
+			return arr
 		},
 	},
 }
