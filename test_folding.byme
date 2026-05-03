@@ -1,0 +1,4 @@
+// test_folding.byme
+let x = 2 + 2 * 3;
+let s = "hello " + "world";
+println(x, s);

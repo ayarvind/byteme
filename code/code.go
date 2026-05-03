@@ -134,7 +134,7 @@ func (ins Instructions) String() string {
 
 	i := 0
 	for i < len(ins) {
-		def, err := Lookup(Opcode(ins[i]))
+		def, err := Lookup(ins[i])
 		if err != nil {
 			fmt.Fprintf(&out, "ERROR: %s\n", err)
 			continue

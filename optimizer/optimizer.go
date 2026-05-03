@@ -20,6 +20,20 @@ func (o *Optimizer) Optimize(node ast.Node) ast.Node {
 		n.Statements = o.optimizeStatements(n.Statements)
 		return n
 
+	case *ast.LetStatement:
+		optimized := o.Optimize(n.Value)
+		if optimized != nil {
+			n.Value = optimized.(ast.Expression)
+		}
+		return n
+
+	case *ast.ConstStatement:
+		optimized := o.Optimize(n.Value)
+		if optimized != nil {
+			n.Value = optimized.(ast.Expression)
+		}
+		return n
+
 	case *ast.ExpressionStatement:
 		optimized := o.Optimize(n.Expression)
 		if optimized == nil {
@@ -70,13 +84,36 @@ func (o *Optimizer) Optimize(node ast.Node) ast.Node {
 		return n
 
 	case *ast.InfixExpression:
-		left := o.Optimize(n.Left)
-		right := o.Optimize(n.Right)
-		if left == nil || right == nil {
-			return nil
+		left := o.Optimize(n.Left).(ast.Expression)
+		right := o.Optimize(n.Right).(ast.Expression)
+		n.Left = left
+		n.Right = right
+
+		// Constant folding for integers
+		if l, ok1 := left.(*ast.IntegerLiteral); ok1 {
+			if r, ok2 := right.(*ast.IntegerLiteral); ok2 {
+				switch n.Operator {
+				case "+":
+					return &ast.IntegerLiteral{Token: n.Token, Value: l.Value + r.Value}
+				case "-":
+					return &ast.IntegerLiteral{Token: n.Token, Value: l.Value - r.Value}
+				case "*":
+					return &ast.IntegerLiteral{Token: n.Token, Value: l.Value * r.Value}
+				case "/":
+					if r.Value != 0 {
+						return &ast.IntegerLiteral{Token: n.Token, Value: l.Value / r.Value}
+					}
+				}
+			}
 		}
-		n.Left = left.(ast.Expression)
-		n.Right = right.(ast.Expression)
+		// Constant folding for strings
+		if l, ok1 := left.(*ast.StringLiteral); ok1 {
+			if r, ok2 := right.(*ast.StringLiteral); ok2 {
+				if n.Operator == "+" {
+					return &ast.StringLiteral{Token: n.Token, Value: l.Value + r.Value}
+				}
+			}
+		}
 		return n
 
 	case *ast.PrefixExpression:
