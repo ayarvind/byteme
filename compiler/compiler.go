@@ -31,11 +31,17 @@ type Compiler struct {
 
 func New() *Compiler {
 	constants := make([]object.Object, 0)
-	return &Compiler{
+	c := &Compiler{
 		instructions: code.Instructions{},
 		constants:    &constants,
 		symbolTable:  NewSymbolTable(),
 	}
+
+	for name, index := range builtins {
+		c.symbolTable.DefineBuiltin(index, name)
+	}
+
+	return c
 }
 
 func NewWithState(s *SymbolTable, constants *[]object.Object) *Compiler {
@@ -160,8 +166,10 @@ func (c *Compiler) Compile(node ast.Node) error {
 				}
 				if symbol.Scope == GlobalScope {
 					c.emit(code.OpSetGlobal, symbol.Index)
-				} else {
+				} else if symbol.Scope == LocalScope {
 					c.emit(code.OpSetLocal, symbol.Index)
+				} else {
+					c.emit(code.OpSetFree, symbol.Index)
 				}
 				c.emit(code.OpNull)
 				return nil
@@ -424,22 +432,12 @@ func (c *Compiler) Compile(node ast.Node) error {
 		}
 
 	case *ast.Identifier:
-		// Check for built-ins
-		if index, ok := builtins[n.Value]; ok {
-			c.emit(code.OpGetBuiltin, index)
-			return nil
-		}
-		
 		symbol, ok := c.symbolTable.Resolve(n.Value)
 		if !ok {
 			return fmt.Errorf("undefined variable: %s", n.Value)
 		}
 		
-		if symbol.Scope == GlobalScope {
-			c.emit(code.OpGetGlobal, symbol.Index)
-		} else {
-			c.emit(code.OpGetLocal, symbol.Index)
-		}
+		c.loadSymbol(symbol)
 
 	case *ast.StructLiteral:
 		if n.Name != nil {
@@ -542,7 +540,11 @@ func (c *Compiler) Compile(node ast.Node) error {
 			// Emit OpNull so that the wrapping expression statement is balanced
 			c.emit(code.OpNull)
 		} else {
-			c.emit(code.OpConstant, c.addConstant(compiledFn))
+		freeSymbols := enclosedCompiler.symbolTable.FreeSymbols
+		for _, s := range freeSymbols {
+			c.loadSymbol(s)
+		}
+		c.emit(code.OpClosure, c.addConstant(compiledFn), len(freeSymbols))
 
 			if n.Name != nil {
 				symbol, _ := c.symbolTable.Resolve(n.Name.Value)
@@ -660,7 +662,12 @@ func (c *Compiler) Compile(node ast.Node) error {
 						NumParameters: len(fnLit.Parameters),
 						IsAsync:       fnLit.IsAsync,
 					}
-					c.emit(code.OpConstant, c.addConstant(compiledFn))
+					
+					freeSymbols := enclosedCompiler.symbolTable.FreeSymbols
+					for _, s := range freeSymbols {
+						c.loadSymbol(s)
+					}
+					c.emit(code.OpClosure, c.addConstant(compiledFn), len(freeSymbols))
 					
 					sym, _ := c.symbolTable.Resolve(compoundName)
 					if sym.Scope == GlobalScope {
@@ -729,95 +736,98 @@ var builtins = map[string]int{
 	"timeFormat":    6,
 	"mapSet":        7,
 	"mapGet":        8,
-	"fileRead":      9,
-	"fileWrite":     10,
-	"map":           11,
-	"chan":          12,
-	"send":          13,
-	"recv":          14,
-	"envGet":        15,
-	"envSet":        16,
-	"args":          17,
-	"exit":          18,
-	"sha256":        19,
-	"md5":           20,
-	"regexMatch":    21,
-	"regexReplace":  22,
-	"osMkdir":       23,
-	"osRmdir":       24,
-	"osRemove":      25,
-	"osRename":      26,
-	"osListdir":     27,
-	"osExists":      28,
-	"osIsdir":       29,
-	"osIsfile":      30,
-	"osGetcwd":      31,
-	"osChdir":       32,
-	"osGetpid":      33,
-	"pathJoin":      34,
-	"pathBase":      35,
-	"pathDir":       36,
-	"fOpen":         37,
-	"fClose":        38,
-	"fRead":         39,
-	"fWrite":        40,
-	"fSeek":         41,
-	"instanceOf":    42,
-	"mapHas":       43,
-	"charAt":       44,
-	"toInt":        45,
-	"toFloat":      46,
-	"mathSin":      47,
-	"mathCos":      48,
-	"mathTan":      49,
-	"mathSqrt":     50,
-	"mathPow":      51,
-	"mathLog":      52,
-	"mathLog10":    53,
-	"mathExp":      54,
-	"mathAsin":     55,
-	"mathAcos":     56,
-	"mathAtan":     57,
-	"mathAtan2":    58,
-	"mathAbs":      59,
-	"mathCeil":     60,
-	"mathFloor":    61,
-	"strToLower":   62,
-	"strToUpper":   63,
-	"strTrim":      64,
-	"strTrimSpace": 65,
-	"strSplit":     66,
-	"strJoin":      67,
-	"strContains":  68,
-	"strHasPrefix": 69,
-	"strHasSuffix": 70,
-	"strIndex":     71,
-	"strLastIndex": 72,
-	"strReplace":   73,
-	"strRepeat":    74,
-	"strCount":     75,
-	"strFields":    76,
-	"strTrimLeft":  77,
-	"strTrimRight": 78,
-	"strIsAlpha":   79,
-	"strIsDigit":   80,
-	"strIsSpace":   81,
-	"strReverse":   82,
-	"ioReadInput":  83,
-	"arrayPush":    84,
-	"arrayPop":     85,
-	"arraySlice":    86,
-	"arraySort":    87,
-	"mapDelete":    88,
-	"mapKeys":      89,
-	"mapValues":    90,
-	"timeParse":    91,
-	"strReplaceAll": 92,
-	"httpHandle":   93,
-	"httpServe":    94,
-	"httpGet":      95,
-	"httpPost":     96,
-	"httpResponse": 97,
+	"mapHas":        9,
+	"fileRead":      10,
+	"fileWrite":     11,
+	"map":           12,
+	"chan":          13,
+	"send":          14,
+	"recv":          15,
+	"envGet":        16,
+	"envSet":        17,
+	"args":          18,
+	"exit":          19,
+	"sha256":        20,
+	"md5":           21,
+	"regexMatch":    22,
+	"regexReplace":  23,
+	"osMkdir":       24,
+	"osRmdir":       25,
+	"osRemove":      26,
+	"osRename":      27,
+	"osListdir":     28,
+	"osExists":      29,
+	"osIsdir":       30,
+	"osIsfile":      31,
+	"osGetcwd":      32,
+	"osChdir":       33,
+	"osGetpid":      34,
+	"pathJoin":      35,
+	"pathBase":      36,
+	"pathDir":       37,
+	"fileOpen":      38,
+	"fileClose":     39,
+	"fileSeek":      42,
+	"instanceOf":    43,
+	"charAt":        45,
+	"toInt":         46,
+	"toFloat":       47,
+	"mathSin":       48,
+	"mathCos":       49,
+	"mathTan":       50,
+	"mathSqrt":      51,
+	"mathPow":       52,
+	"mathLog":       53,
+	"mathLog10":     54,
+	"mathExp":       55,
+	"mathAsin":      56,
+	"mathAcos":      57,
+	"mathAtan":      58,
+	"mathAtan2":     59,
+	"mathAbs":       60,
+	"mathCeil":      61,
+	"mathFloor":     62,
+	"strToLower":    63,
+	"strToUpper":    64,
+	"strTrim":       65,
+	"strTrimSpace":  66,
+	"strSplit":      67,
+	"strJoin":       68,
+	"strContains":   69,
+	"strHasPrefix":  70,
+	"strHasSuffix":  71,
+	"strIndex":      72,
+	"strLastIndex":  73,
+	"strReplace":    74,
+	"strRepeat":     75,
+	"strCount":      76,
+	"strFields":     77,
+	"strTrimLeft":   78,
+	"strTrimRight":  79,
+	"strIsAlpha":    80,
+	"strIsDigit":    81,
+	"strIsSpace":    82,
+	"strReverse":    83,
+	"ioReadInput":   84,
+	"arrayPush":     85,
+	"arrayPop":      86,
+	"arraySlice":    87,
+	"arraySort":     88,
+	"mapDelete":     89,
+	"mapKeys":       90,
+	"mapValues":     91,
+	"timeParse":     92,
+	"strReplaceAll": 93,
+	"timeAdd":       94,
+	"timeSub":       95,
+	"timeDiff":      96,
+	"timeInLocation": 97,
+	"typeof":         98,
+	"httpHandle":    99,
+	"httpServe":     100,
+	"httpGet":       101,
+	"httpPost":      102,
+	"httpResponse":  103,
 }
 
 func (c *Compiler) Bytecode() *Bytecode {
@@ -846,6 +856,19 @@ func (c *Compiler) lastInstructionIs(op code.Opcode) bool {
 		return false
 	}
 	return c.lastInstruction.Opcode == op
+}
+
+func (c *Compiler) loadSymbol(s Symbol) {
+	switch s.Scope {
+	case GlobalScope:
+		c.emit(code.OpGetGlobal, s.Index)
+	case LocalScope:
+		c.emit(code.OpGetLocal, s.Index)
+	case BuiltinScope:
+		c.emit(code.OpGetBuiltin, s.Index)
+	case FreeScope:
+		c.emit(code.OpGetFree, s.Index)
+	}
 }
 
 func (c *Compiler) addInstruction(ins []byte) int {

@@ -24,7 +24,7 @@ let y: string = x;
 		t.Errorf("expected type mismatch error, got none")
 	}
 	
-	expected := "type mismatch: cannot assign int to string"
+	expected := "[3:1] type mismatch: cannot assign int to string"
 	if a.Errors()[0] != expected {
 		t.Errorf("wrong error message. expected=%q, got=%q", expected, a.Errors()[0])
 	}
@@ -46,7 +46,7 @@ let x: int = y + 5;
 		t.Errorf("expected undefined variable error, got none")
 	}
 	
-	expected := "undefined variable: y"
+	expected := "[2:14] undefined variable: y"
 	if a.Errors()[0] != expected {
 		t.Errorf("wrong error message. expected=%q, got=%q", expected, a.Errors()[0])
 	}

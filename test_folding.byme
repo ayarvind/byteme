@@ -1,4 +1,9 @@
 // test_folding.byme
-let x = 2 + 2 * 3;
+
+fn add(a: any, b: any) {
+    return a + b;
+}
+
+let x = add(2, 2 * 3);
 let s = "hello " + "world";
 println(x, s);

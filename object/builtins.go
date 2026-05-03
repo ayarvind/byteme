@@ -95,10 +95,10 @@ var Builtins = []*Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 3 { return NULL }
 			m, ok := args[0].(*Map)
-			key, ok2 := args[1].(*String)
-			if !ok || !ok2 { return NULL }
-			m.Pairs[key.Value] = args[2]
-			return NULL
+			if !ok { return NULL }
+			key := args[1]
+			m.Pairs[key.Inspect()] = MapPair{Key: key, Value: args[2]}
+			return m
 		},
 	},
 	{ // 8: mapGet
@@ -107,9 +107,20 @@ var Builtins = []*Builtin{
 			m, ok := args[0].(*Map)
 			key, ok2 := args[1].(*String)
 			if !ok || !ok2 { return NULL }
-			val, ok := m.Pairs[key.Value]
+			pair, ok := m.Pairs[key.Value]
 			if !ok { return NULL }
-			return val
+			return pair.Value
+		},
+	},
+	{ // 43: mapHas
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 { return NULL }
+			m, ok := args[0].(*Map)
+			if !ok { return FALSE }
+			key := args[1].Inspect()
+			_, ok = m.Pairs[key]
+			if ok { return TRUE }
+			return FALSE
 		},
 	},
 	{ // 9: fileRead
@@ -135,7 +146,7 @@ var Builtins = []*Builtin{
 	},
 	{ // 11: map
 		Fn: func(args ...Object) Object {
-			return &Map{Pairs: make(map[string]Object)}
+			return &Map{Pairs: make(map[string]MapPair)}
 		},
 	},
 	{ // 12: chan
@@ -986,11 +997,8 @@ var Builtins = []*Builtin{
 			m, ok := args[0].(*Map)
 			if !ok { return NULL }
 			keys := make([]Object, 0, len(m.Pairs))
-			// Since our Map stores keys by string Inspect() representation, 
-			// we can't easily recover the original objects if they weren't strings.
-			// But for now, returning string keys is better than nothing.
-			for k := range m.Pairs {
-				keys = append(keys, &String{Value: k})
+			for _, pair := range m.Pairs {
+				keys = append(keys, pair.Key)
 			}
 			return &Array{Elements: keys}
 		},
@@ -1001,8 +1009,8 @@ var Builtins = []*Builtin{
 			m, ok := args[0].(*Map)
 			if !ok { return NULL }
 			vals := make([]Object, 0, len(m.Pairs))
-			for _, v := range m.Pairs {
-				vals = append(vals, v)
+			for _, pair := range m.Pairs {
+				vals = append(vals, pair.Value)
 			}
 			return &Array{Elements: vals}
 		},
@@ -1032,6 +1040,54 @@ var Builtins = []*Builtin{
 			return &String{Value: strings.ReplaceAll(s.Value, oldS.Value, newS.Value)}
 		},
 	},
+	{ // 93: timeAdd
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 { return NULL }
+			ts, ok1 := args[0].(*Integer)
+			seconds, ok2 := args[1].(*Integer)
+			if !ok1 || !ok2 { return NULL }
+			return &Integer{Value: ts.Value + seconds.Value}
+		},
+	},
+	{ // 94: timeSub
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 { return NULL }
+			ts, ok1 := args[0].(*Integer)
+			seconds, ok2 := args[1].(*Integer)
+			if !ok1 || !ok2 { return NULL }
+			return &Integer{Value: ts.Value - seconds.Value}
+		},
+	},
+	{ // 95: timeDiff
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 { return NULL }
+			ts1, ok1 := args[0].(*Integer)
+			ts2, ok2 := args[1].(*Integer)
+			if !ok1 || !ok2 { return NULL }
+			return &Integer{Value: ts1.Value - ts2.Value}
+		},
+	},
+	{ // 96: timeInLocation
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 { return NULL }
+			ts, ok1 := args[0].(*Integer)
+			locName, ok2 := args[1].(*String)
+			if !ok1 || !ok2 { return NULL }
+			
+			loc, err := time.LoadLocation(locName.Value)
+			if err != nil {
+				return &Error{Message: err.Error()}
+			}
+			t := time.Unix(ts.Value, 0).In(loc)
+			return &String{Value: t.Format("2006-01-02 15:04:05 MST")}
+		},
+	},
+	{ // 97: typeof
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			return &String{Value: string(args[0].Type())}
+		},
+	},
 }
 
 func ConvertToByteMeObject(val interface{}) Object {
@@ -1050,9 +1106,10 @@ func ConvertToByteMeObject(val interface{}) Object {
 		}
 		return &Array{Elements: elements}
 	case map[string]interface{}:
-		pairs := make(map[string]Object)
+		pairs := make(map[string]MapPair)
 		for k, val := range v {
-			pairs[k] = ConvertToByteMeObject(val)
+			obj := ConvertToByteMeObject(val)
+			pairs[k] = MapPair{Key: &String{Value: k}, Value: obj}
 		}
 		return &Map{Pairs: pairs}
 	default:
@@ -1075,7 +1132,7 @@ func ConvertToNative(obj Object) interface{} {
 	case *Map:
 		res := make(map[string]interface{})
 		for k, v := range o.Pairs {
-			res[k] = ConvertToNative(v)
+			res[k] = ConvertToNative(v.Value)
 		}
 		return res
 	default:

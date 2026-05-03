@@ -107,19 +107,19 @@ func builtinHTTPServe(args ...Object) Object {
 
 		// Build a ByteMe request map
 		bodyBytes, _ := io.ReadAll(r.Body)
-		reqMap := &Map{Pairs: map[string]Object{
+		reqMap := NewStringMap(map[string]Object{
 			"method": &String{Value: r.Method},
 			"path":   &String{Value: r.URL.Path},
 			"query":  &String{Value: r.URL.RawQuery},
 			"body":   &String{Value: string(bodyBytes)},
-		}}
+		})
 
 		// Build headers map
-		headers := &Map{Pairs: make(map[string]Object)}
+		headers := NewStringMap(make(map[string]Object))
 		for k, v := range r.Header {
-			headers.Pairs[k] = &String{Value: strings.Join(v, ", ")}
+			headers.Pairs[k] = MapPair{Key: &String{Value: k}, Value: &String{Value: strings.Join(v, ", ")}}
 		}
-		reqMap.Pairs["headers"] = headers
+		reqMap.Pairs["headers"] = MapPair{Key: &String{Value: "headers"}, Value: headers}
 
 		// Call the ByteMe handler — always use the live constants/globals via pointers
 		var result Object = NULL
@@ -139,14 +139,20 @@ func builtinHTTPServe(args ...Object) Object {
 		contentType := "text/plain"
 
 		if resMap, ok := result.(*Map); ok {
-			if s, ok := resMap.Pairs["status"].(*Integer); ok {
-				status = int(s.Value)
+			if sObj, ok := resMap.Get("status"); ok {
+				if s, ok := sObj.(*Integer); ok {
+					status = int(s.Value)
+				}
 			}
-			if b, ok := resMap.Pairs["body"].(*String); ok {
-				body = b.Value
+			if bObj, ok := resMap.Get("body"); ok {
+				if b, ok := bObj.(*String); ok {
+					body = b.Value
+				}
 			}
-			if ct, ok := resMap.Pairs["contentType"].(*String); ok {
-				contentType = ct.Value
+			if ctObj, ok := resMap.Get("contentType"); ok {
+				if ct, ok := ctObj.(*String); ok {
+					contentType = ct.Value
+				}
 			}
 		} else if s, ok := result.(*String); ok {
 			body = s.Value
@@ -184,16 +190,16 @@ func builtinHTTPGet(args ...Object) Object {
 
 	bodyBytes, _ := io.ReadAll(resp.Body)
 
-	headers := &Map{Pairs: make(map[string]Object)}
+	headers := NewStringMap(make(map[string]Object))
 	for k, v := range resp.Header {
-		headers.Pairs[k] = &String{Value: strings.Join(v, ", ")}
+		headers.Pairs[k] = MapPair{Key: &String{Value: k}, Value: &String{Value: strings.Join(v, ", ")}}
 	}
 
-	return &Map{Pairs: map[string]Object{
+	return NewStringMap(map[string]Object{
 		"status":  &Integer{Value: int64(resp.StatusCode)},
 		"body":    &String{Value: string(bodyBytes)},
 		"headers": headers,
-	}}
+	})
 }
 
 // builtinHTTPPost performs an HTTP POST.
@@ -216,10 +222,10 @@ func builtinHTTPPost(args ...Object) Object {
 	defer resp.Body.Close()
 
 	bodyBytes, _ := io.ReadAll(resp.Body)
-	return &Map{Pairs: map[string]Object{
+	return NewStringMap(map[string]Object{
 		"status": &Integer{Value: int64(resp.StatusCode)},
 		"body":   &String{Value: string(bodyBytes)},
-	}}
+	})
 }
 
 // builtinHTTPResponse creates a response map.
@@ -235,13 +241,13 @@ func builtinHTTPResponse(args ...Object) Object {
 		return &Error{Message: "httpResponse: status must be int, body must be string"}
 	}
 
-	res := &Map{Pairs: map[string]Object{
+	res := NewStringMap(map[string]Object{
 		"status": status,
 		"body":   body,
-	}}
+	})
 	if len(args) == 3 {
 		if ct, ok := args[2].(*String); ok {
-			res.Pairs["contentType"] = ct
+			res.Pairs["contentType"] = MapPair{Key: &String{Value: "contentType"}, Value: ct}
 		}
 	}
 	return res

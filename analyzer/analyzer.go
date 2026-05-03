@@ -41,6 +41,10 @@ func New(env *environment.Environment) *Analyzer {
 	env.Set("mapValues", "function", environment.PUBLIC, true)
 	env.Set("timeParse", "function", environment.PUBLIC, true)
 	env.Set("strReplaceAll", "function", environment.PUBLIC, true)
+	env.Set("timeAdd", "function", environment.PUBLIC, true)
+	env.Set("timeSub", "function", environment.PUBLIC, true)
+	env.Set("timeDiff", "function", environment.PUBLIC, true)
+	env.Set("timeInLocation", "function", environment.PUBLIC, true)
 	env.Set("ioReadInput", "function", environment.PUBLIC, true)
 	env.Set("fileRead", "function", environment.PUBLIC, true)
 	env.Set("fileWrite", "function", environment.PUBLIC, true)
@@ -61,6 +65,7 @@ func New(env *environment.Environment) *Analyzer {
 	
 	env.Set("toInt",        "function", environment.PUBLIC, true)
 	env.Set("toFloat",      "function", environment.PUBLIC, true)
+	env.Set("typeof",       "function", environment.PUBLIC, true)
 	env.Set("len",          "function", environment.PUBLIC, true)
 	env.Set("envGet",       "function", environment.PUBLIC, true)
 	env.Set("envSet",       "function", environment.PUBLIC, true)

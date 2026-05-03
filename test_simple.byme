@@ -1,0 +1,9 @@
+let k1 = {id: 1};
+let k2 = [1, 2, 3];
+
+let m = map();
+mapSet(m, k1, "hello");
+mapSet(m, k2, "world");
+
+println(mapGet(m, k1));
+println(mapGet(m, k2));

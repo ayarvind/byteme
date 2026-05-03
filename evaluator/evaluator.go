@@ -99,7 +99,7 @@ var builtins = map[string]*object.Builtin{
 	},
 	"map": {
 		Fn: func(args ...object.Object) object.Object {
-			return &object.Map{Pairs: make(map[string]object.Object)}
+			return &object.Map{Pairs: make(map[string]object.MapPair)}
 		},
 	},
 	"mapSet": {
@@ -109,7 +109,7 @@ var builtins = map[string]*object.Builtin{
 			if !ok { return NULL }
 			key, ok := args[1].(*object.String)
 			if !ok { return NULL }
-			m.Pairs[key.Value] = args[2]
+			m.Pairs[key.Value] = object.MapPair{Key: key, Value: args[2]}
 			return NULL
 		},
 	},
@@ -120,7 +120,7 @@ var builtins = map[string]*object.Builtin{
 			if !ok { return NULL }
 			key, ok := args[1].(*object.String)
 			if !ok { return NULL }
-			val, ok := m.Pairs[key.Value]
+			val, ok := m.Get(key.Value)
 			if !ok { return NULL }
 			return val
 		},
@@ -132,7 +132,7 @@ var builtins = map[string]*object.Builtin{
 			if !ok { return FALSE }
 			key, ok := args[1].(*object.String)
 			if !ok { return FALSE }
-			_, ok = m.Pairs[key.Value]
+			_, ok = m.Get(key.Value)
 			return nativeBoolToBooleanObject(ok)
 		},
 	},
@@ -259,6 +259,12 @@ var builtins = map[string]*object.Builtin{
 			}
 			
 			return nativeFn(args[1:]...)
+		},
+	},
+	"typeof": {
+		Fn: func(args ...object.Object) object.Object {
+			if len(args) != 1 { return NULL }
+			return &object.String{Value: string(args[0].Type())}
 		},
 	},
 }
@@ -798,14 +804,9 @@ func evalTryStatement(ts *ast.TryStatement, env *environment.Environment) object
 func evalEnumStatement(es *ast.EnumStatement, env *environment.Environment) object.Object {
 	nsEnv := environment.NewEnclosedEnvironment(env)
 	for i, member := range es.Members {
-		nsEnv.Set(member.Value, "int", environment.PUBLIC, true)
 		nsEnv.SetVal(member.Value, &object.Integer{Value: int64(i)})
 	}
-	
-	ns := &object.Namespace{
-		Name: es.Name.Value,
-		Env:  nsEnv,
-	}
+	ns := &object.Namespace{Name: es.Name.Value, Env: nsEnv}
 	env.SetVal(es.Name.Value, ns)
 	return ns
 }

@@ -82,6 +82,13 @@ type CompiledFunction struct {
 func (cf *CompiledFunction) Type() ObjectType { return "COMPILED_FUNCTION" }
 func (cf *CompiledFunction) Inspect() string  { return fmt.Sprintf("CompiledFunction[%p]", cf) }
 
+type Closure struct {
+	Fn   *CompiledFunction
+	Free []Object
+}
+func (c *Closure) Type() ObjectType { return "CLOSURE" }
+func (c *Closure) Inspect() string  { return fmt.Sprintf("Closure[%p]", c) }
+
 // Future represents a value that will be available later (for async/await)
 type Future struct {
 	ValueChan chan Object
@@ -188,6 +195,22 @@ func (m *Map) Inspect() string {
 	}
 	out.WriteString("}")
 	return out.String()
+}
+
+func (m *Map) Get(key string) (Object, bool) {
+	pair, ok := m.Pairs[key]
+	if !ok {
+		return nil, false
+	}
+	return pair.Value, true
+}
+
+func NewStringMap(m map[string]Object) *Map {
+	pairs := make(map[string]MapPair)
+	for k, v := range m {
+		pairs[k] = MapPair{Key: &String{Value: k}, Value: v}
+	}
+	return &Map{Pairs: pairs}
 }
 
 type Error struct {

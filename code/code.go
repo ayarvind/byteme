@@ -56,6 +56,9 @@ const (
 	OpAwait
 	OpIndex
 	OpSetIndex
+	OpGetFree
+	OpClosure
+	OpSetFree
 )
 
 type Definition struct {
@@ -109,6 +112,9 @@ var definitions = map[Opcode]*Definition{
 	OpAwait:         {"OpAwait", []int{}},
 	OpIndex:         {"OpIndex", []int{}},
 	OpSetIndex:      {"OpSetIndex", []int{}},
+	OpGetFree:       {"OpGetFree", []int{1}},
+	OpClosure:       {"OpClosure", []int{2, 1}}, // 2rd operand is number of upvalues
+	OpSetFree:       {"OpSetFree", []int{1}},
 }
 
 func Lookup(op byte) (*Definition, error) {

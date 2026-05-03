@@ -1,3 +1,0 @@
-import 'test_enum.byme'
-let pending = Status.Pending;
-println(pendin);
