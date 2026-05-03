@@ -1,0 +1,275 @@
+Main Bytecode:
+0000 OpStructDef 0
+0003 OpSetGlobal 0
+0006 OpNull
+0007 OpPop
+0008 OpNull
+0009 OpSetGlobal 1
+0012 OpGetGlobal 0
+0015 OpGetBuiltin 11
+0017 OpCall 0
+0019 OpFalse
+0020 OpCall 2
+0022 OpSetGlobal 2
+0025 OpConstant 9
+0028 OpSetGlobal 3
+0031 OpConstant 15
+0034 OpSetGlobal 4
+0037 OpConstant 20
+0040 OpSetGlobal 5
+0043 OpNull
+0044 OpPop
+0045 OpGetBuiltin 0
+0047 OpConstant 21
+0050 OpCall 1
+0052 OpPop
+0053 OpGetGlobal 3
+0056 OpConstant 22
+0059 OpCall 1
+0061 OpPop
+0062 OpGetGlobal 3
+0065 OpConstant 23
+0068 OpCall 1
+0070 OpPop
+0071 OpGetGlobal 3
+0074 OpConstant 24
+0077 OpCall 1
+0079 OpPop
+0080 OpGetBuiltin 0
+0082 OpConstant 25
+0085 OpGetGlobal 4
+0088 OpConstant 26
+0091 OpCall 1
+0093 OpCall 2
+0095 OpPop
+0096 OpGetBuiltin 0
+0098 OpConstant 27
+0101 OpGetGlobal 4
+0104 OpConstant 28
+0107 OpCall 1
+0109 OpCall 2
+0111 OpPop
+0112 OpGetBuiltin 0
+0114 OpConstant 29
+0117 OpGetGlobal 4
+0120 OpConstant 30
+0123 OpCall 1
+0125 OpCall 2
+0127 OpPop
+0128 OpGetBuiltin 0
+0130 OpConstant 31
+0133 OpGetGlobal 4
+0136 OpConstant 32
+0139 OpCall 1
+0141 OpCall 2
+0143 OpPop
+0144 OpGetBuiltin 0
+0146 OpConstant 33
+0149 OpGetGlobal 4
+0152 OpConstant 34
+0155 OpCall 1
+0157 OpCall 2
+0159 OpPop
+0160 OpGetBuiltin 0
+0162 OpConstant 35
+0165 OpGetGlobal 5
+0168 OpConstant 36
+0171 OpCall 1
+0173 OpCall 2
+0175 OpPop
+0176 OpGetBuiltin 0
+0178 OpConstant 37
+0181 OpGetGlobal 5
+0184 OpConstant 38
+0187 OpCall 1
+0189 OpCall 2
+0191 OpPop
+0192 OpGetBuiltin 0
+0194 OpConstant 39
+0197 OpGetGlobal 5
+0200 OpConstant 40
+0203 OpCall 1
+0205 OpCall 2
+0207 OpPop
+0208 OpGetBuiltin 0
+0210 OpConstant 41
+0213 OpCall 1
+0215 OpPop
+0216 OpGetGlobal 3
+0219 OpConstant 42
+0222 OpCall 1
+0224 OpPop
+0225 OpGetBuiltin 0
+0227 OpConstant 43
+0230 OpGetGlobal 4
+0233 OpConstant 44
+0236 OpCall 1
+0238 OpCall 2
+0240 OpPop
+
+
+Constant Function 9:
+0000 OpGetGlobal 2
+0003 OpSetLocal 1
+0005 OpConstant 1
+0008 OpSetLocal 2
+0010 OpGetBuiltin 1
+0012 OpGetLocal 0
+0014 OpCall 1
+0016 OpSetLocal 3
+0018 OpGetLocal 3
+0020 OpGetLocal 2
+0022 OpGreaterThan
+0023 OpJumpNotTruthy 103
+0026 OpGetBuiltin 49
+0028 OpGetLocal 0
+0030 OpGetLocal 2
+0032 OpCall 2
+0034 OpSetLocal 4
+0036 OpGetBuiltin 48
+0038 OpGetLocal 1
+0040 OpGetField 2
+0043 OpGetLocal 4
+0045 OpCall 2
+0047 OpBang
+0048 OpJumpNotTruthy 73
+0051 OpGetBuiltin 7
+0053 OpGetLocal 1
+0055 OpGetField 3
+0058 OpGetLocal 4
+0060 OpGetGlobal 0
+0063 OpGetBuiltin 11
+0065 OpCall 0
+0067 OpFalse
+0068 OpCall 2
+0070 OpCall 3
+0072 OpPop
+0073 OpNull
+0074 OpPop
+0075 OpGetBuiltin 8
+0077 OpGetLocal 1
+0079 OpGetField 4
+0082 OpGetLocal 4
+0084 OpCall 2
+0086 OpSetLocal 1
+0088 OpNull
+0089 OpPop
+0090 OpGetLocal 2
+0092 OpConstant 5
+0095 OpAdd
+0096 OpSetLocal 2
+0098 OpNull
+0099 OpPop
+0100 OpJump 18
+0103 OpNull
+0104 OpGetLocal 1
+0106 OpTrue
+0107 OpSetField 6
+0110 OpPop
+0111 OpGetBuiltin 0
+0113 OpConstant 7
+0116 OpGetLocal 0
+0118 OpCall 2
+0120 OpPop
+0121 OpConstant 8
+0124 OpReturnValue
+
+
+Constant Function 15:
+0000 OpGetGlobal 2
+0003 OpSetLocal 1
+0005 OpConstant 10
+0008 OpSetLocal 2
+0010 OpGetBuiltin 1
+0012 OpGetLocal 0
+0014 OpCall 1
+0016 OpSetLocal 3
+0018 OpGetLocal 3
+0020 OpGetLocal 2
+0022 OpGreaterThan
+0023 OpJumpNotTruthy 83
+0026 OpGetBuiltin 49
+0028 OpGetLocal 0
+0030 OpGetLocal 2
+0032 OpCall 2
+0034 OpSetLocal 4
+0036 OpGetBuiltin 48
+0038 OpGetLocal 1
+0040 OpGetField 11
+0043 OpGetLocal 4
+0045 OpCall 2
+0047 OpBang
+0048 OpJumpNotTruthy 53
+0051 OpFalse
+0052 OpReturnValue
+0053 OpNull
+0054 OpPop
+0055 OpGetBuiltin 8
+0057 OpGetLocal 1
+0059 OpGetField 12
+0062 OpGetLocal 4
+0064 OpCall 2
+0066 OpSetLocal 1
+0068 OpNull
+0069 OpPop
+0070 OpGetLocal 2
+0072 OpConstant 13
+0075 OpAdd
+0076 OpSetLocal 2
+0078 OpNull
+0079 OpPop
+0080 OpJump 18
+0083 OpNull
+0084 OpGetLocal 1
+0086 OpGetField 14
+0089 OpReturnValue
+
+
+Constant Function 20:
+0000 OpGetGlobal 2
+0003 OpSetLocal 1
+0005 OpConstant 16
+0008 OpSetLocal 2
+0010 OpGetBuiltin 1
+0012 OpGetLocal 0
+0014 OpCall 1
+0016 OpSetLocal 3
+0018 OpGetLocal 3
+0020 OpGetLocal 2
+0022 OpGreaterThan
+0023 OpJumpNotTruthy 83
+0026 OpGetBuiltin 49
+0028 OpGetLocal 0
+0030 OpGetLocal 2
+0032 OpCall 2
+0034 OpSetLocal 4
+0036 OpGetBuiltin 48
+0038 OpGetLocal 1
+0040 OpGetField 17
+0043 OpGetLocal 4
+0045 OpCall 2
+0047 OpBang
+0048 OpJumpNotTruthy 53
+0051 OpFalse
+0052 OpReturnValue
+0053 OpNull
+0054 OpPop
+0055 OpGetBuiltin 8
+0057 OpGetLocal 1
+0059 OpGetField 18
+0062 OpGetLocal 4
+0064 OpCall 2
+0066 OpSetLocal 1
+0068 OpNull
+0069 OpPop
+0070 OpGetLocal 2
+0072 OpConstant 19
+0075 OpAdd
+0076 OpSetLocal 2
+0078 OpNull
+0079 OpPop
+0080 OpJump 18
+0083 OpNull
+0084 OpTrue
+0085 OpReturnValue
+

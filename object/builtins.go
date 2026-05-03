@@ -473,6 +473,31 @@ var Builtins = []*Builtin{
 			}
 		},
 	},
+	{ // 43: mapHas
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 { return NULL }
+			m, ok := args[0].(*Map)
+			key, ok2 := args[1].(*String)
+			if !ok || !ok2 { return NULL }
+			_, exists := m.Pairs[key.Value]
+			if exists {
+				return TRUE
+			}
+			return FALSE
+		},
+	},
+	{ // 44: charAt
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 { return NULL }
+			s, ok := args[0].(*String)
+			i, ok2 := args[1].(*Integer)
+			if !ok || !ok2 { return NULL }
+			if i.Value < 0 || i.Value >= int64(len(s.Value)) {
+				return NULL
+			}
+			return &String{Value: string(s.Value[i.Value])}
+		},
+	},
 }
 
 func ConvertToByteMeObject(val interface{}) Object {

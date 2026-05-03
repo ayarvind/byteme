@@ -674,12 +674,13 @@ var builtins = map[string]int{
 	"fWrite":        40,
 	"fSeek":         41,
 	"instanceOf":    42,
-	// HTTP / networking
-	"httpHandle":   43,
-	"httpServe":    44,
-	"httpGet":      45,
-	"httpPost":     46,
-	"httpResponse": 47,
+	"mapHas":       43,
+	"charAt":       44,
+	"httpHandle":   45,
+	"httpServe":    46,
+	"httpGet":      47,
+	"httpPost":     48,
+	"httpResponse": 49,
 }
 
 func (c *Compiler) Bytecode() *Bytecode {
