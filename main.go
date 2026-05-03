@@ -8,6 +8,7 @@ import (
 
 	"github.com/byteme/compiler/analyzer"
 	"github.com/byteme/compiler/ast"
+	"github.com/byteme/compiler/code"
 	"github.com/byteme/compiler/compiler"
 	"github.com/byteme/compiler/environment"
 	"github.com/byteme/compiler/evaluator"
@@ -31,6 +32,7 @@ func init() {
 func main() {
 	compileOnly := flag.Bool("c", false, "compile only, do not run")
 	useEvaluator := flag.Bool("eval", false, "use the tree-walk evaluator instead of VM")
+	disassemble := flag.Bool("d", false, "disassemble bytecode")
 	flag.Parse()
 
 	if len(flag.Args()) < 1 {
@@ -69,6 +71,31 @@ func main() {
 	// 4. Optimization
 	opt := optimizer.New()
 	optimized := opt.Optimize(program).(*ast.Program)
+
+	if *disassemble {
+		comp := compiler.New()
+		err := comp.Compile(optimized)
+		if err != nil {
+			fmt.Printf("Compilation Error: %s\n", err)
+			os.Exit(1)
+		}
+		bytecode := comp.Bytecode()
+		fmt.Println("Main Bytecode:")
+		fmt.Println(bytecode.Instructions.String())
+		
+		for i, constant := range bytecode.Constants {
+			if fn, ok := constant.(*object.CompiledFunction); ok {
+				fmt.Printf("\nConstant Function %d:\n", i)
+				fmt.Println(code.Instructions(fn.Instructions).String())
+			} else if sl, ok := constant.(*object.StructLiteral); ok {
+				for name, meth := range sl.Methods {
+					fmt.Printf("\nMethod %s.%s:\n", sl.Name, name)
+					fmt.Println(code.Instructions(meth.Instructions).String())
+				}
+			}
+		}
+		return
+	}
 
 	if *compileOnly {
 		comp := compiler.New()

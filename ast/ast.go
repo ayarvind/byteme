@@ -295,6 +295,7 @@ func (ie *IfExpression) String() string {
 type FunctionLiteral struct {
 	Token          token.Token
 	Name           *Identifier
+	Receiver       *Parameter
 	Parameters     []*Parameter
 	Body           *BlockStatement
 	ReturnType     string

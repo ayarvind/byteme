@@ -1,0 +1,28 @@
+// test_interfaces.byme
+interface Greeter {
+    fn sayHello();
+}
+
+struct Human {
+    name: string
+}
+
+fn (h: Human) sayHello() {
+    println("Hello, I am", h.name);
+}
+
+struct Robot {
+    id: int
+}
+
+// Robot does NOT implement sayHello()
+
+println("=== Interface Validation Test ===");
+
+let g1: Greeter = Human("Alice");
+g1.sayHello();
+
+println("\nTesting invalid assignment (should fail analyzer)...");
+// let g2: Greeter = Robot(123); // If uncommented, this should show analyzer error
+
+println("=== Test Complete ===");

@@ -140,8 +140,9 @@ func (b *Builtin) Type() ObjectType { return BUILTIN_OBJ }
 func (b *Builtin) Inspect() string  { return "builtin function" }
 
 type StructLiteral struct {
-	Name   string
-	Fields []*ast.Parameter
+	Name    string
+	Fields  []*ast.Parameter
+	Methods map[string]*CompiledFunction
 }
 func (s *StructLiteral) Type() ObjectType { return STRUCT_LITERAL_OBJ }
 func (s *StructLiteral) Inspect() string  { return fmt.Sprintf("struct %s", s.Name) }
@@ -161,6 +162,13 @@ func (s *StructInstance) Inspect() string {
 	out.WriteString("}")
 	return out.String()
 }
+
+type BoundMethod struct {
+	Receiver Object
+	Method   *CompiledFunction
+}
+func (bm *BoundMethod) Type() ObjectType { return "BOUND_METHOD" }
+func (bm *BoundMethod) Inspect() string  { return fmt.Sprintf("BoundMethod[%p]", bm.Method) }
 
 type Map struct {
 	Pairs map[string]Object

@@ -1,0 +1,25 @@
+// test_methods.byme
+struct Point {
+    x: int,
+    y: int
+}
+
+fn (p: Point) distance(other: Point) {
+    println("Calculating distance for Point(" + p.x + ", " + p.y + ")...");
+    let dx = other.x - p.x;
+    let dy = other.y - p.y;
+    return dx * dx + dy * dy; // squared distance for simplicity
+}
+
+fn (p: Point) show() {
+    println("Point { x:", p.x, ", y:", p.y, "}");
+}
+
+let p1 = Point(10, 20);
+let p2 = Point(15, 25);
+
+p1.show();
+p2.show();
+
+let d = p1.distance(p2);
+println("Squared distance:", d);

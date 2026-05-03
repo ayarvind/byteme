@@ -1,0 +1,10 @@
+// test_interfaces_fail.byme
+interface Greeter {
+    fn sayHello();
+}
+
+struct Robot {
+    id: int
+}
+
+let g: Greeter = Robot(123);

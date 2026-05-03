@@ -385,6 +385,11 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 		enclosedCompiler := NewEnclosedCompiler(c)
 
+		if n.Receiver != nil {
+			// Prepend receiver as first parameter
+			enclosedCompiler.symbolTable.Define(n.Receiver.Name.Value)
+		}
+
 		for _, p := range n.Parameters {
 			enclosedCompiler.symbolTable.Define(p.Name.Value)
 		}
@@ -396,25 +401,48 @@ func (c *Compiler) Compile(node ast.Node) error {
 			enclosedCompiler.emit(code.OpReturn)
 		}
 
+		numParams := len(n.Parameters)
+		if n.Receiver != nil { numParams++ }
+
 		compiledFn := &object.CompiledFunction{
 			Instructions:  enclosedCompiler.instructions,
 			NumLocals:     enclosedCompiler.symbolTable.numDefinitions,
-			NumParameters: len(n.Parameters),
+			NumParameters: numParams,
 			IsAsync:       n.IsAsync,
 		}
 
-		c.emit(code.OpConstant, c.addConstant(compiledFn))
-
-		if n.Name != nil {
-			symbol, _ := c.symbolTable.Resolve(n.Name.Value)
-			if symbol.Scope == GlobalScope {
-				c.emit(code.OpSetGlobal, symbol.Index)
-			} else {
-				c.emit(code.OpSetLocal, symbol.Index)
+		if n.Receiver != nil {
+			// It's a method! Attach it to the struct definition in constants.
+			found := false
+			for _, constant := range *c.constants {
+				if sl, ok := constant.(*object.StructLiteral); ok && sl.Name == n.Receiver.Type {
+					if sl.Methods == nil {
+						sl.Methods = make(map[string]*object.CompiledFunction)
+					}
+					sl.Methods[n.Name.Value] = compiledFn
+					found = true
+					break
+				}
 			}
-			// Since OpSetGlobal/Local pops the stack, we push a null
-			// so that the wrapping ExpressionStatement's OpPop doesn't panic.
+			if !found {
+				return fmt.Errorf("method defined for unknown type: %s", n.Receiver.Type)
+			}
+			// Emit OpNull so that the wrapping expression statement is balanced
 			c.emit(code.OpNull)
+		} else {
+			c.emit(code.OpConstant, c.addConstant(compiledFn))
+
+			if n.Name != nil {
+				symbol, _ := c.symbolTable.Resolve(n.Name.Value)
+				if symbol.Scope == GlobalScope {
+					c.emit(code.OpSetGlobal, symbol.Index)
+				} else {
+					c.emit(code.OpSetLocal, symbol.Index)
+				}
+				// Since OpSetGlobal/Local pops the stack, we push a null
+				// so that the wrapping ExpressionStatement's OpPop doesn't panic.
+				c.emit(code.OpNull)
+			}
 		}
 
 	case *ast.CallExpression:

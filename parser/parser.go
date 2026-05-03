@@ -135,8 +135,8 @@ func (p *Parser) Errors() []string {
 }
 
 func (p *Parser) peekError(t token.TokenType) {
-	msg := fmt.Sprintf("expected next token to be %s, got %s instead",
-		t, p.peekToken.Type)
+	msg := fmt.Sprintf("[%d:%d] expected next token to be %s, got %s instead",
+		p.peekToken.Line, p.peekToken.Column, t, p.peekToken.Type)
 	p.errors = append(p.errors, msg)
 }
 
@@ -688,6 +688,17 @@ func (p *Parser) parseAsyncFunctionLiteral() ast.Expression {
 
 func (p *Parser) parseFunctionLiteral() ast.Expression {
 	lit := &ast.FunctionLiteral{Token: p.curToken}
+
+	if p.peekTokenIs(token.LPAREN) {
+		p.nextToken() // cur is (
+		p.nextToken() // cur is receiver name
+		recvName := &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+		if !p.expectPeek(token.COLON) { return nil }
+		p.nextToken() // cur is receiver type
+		recvType := p.curToken.Literal
+		if !p.expectPeek(token.RPAREN) { return nil }
+		lit.Receiver = &ast.Parameter{Name: recvName, Type: recvType}
+	}
 
 	if p.peekTokenIs(token.IDENT) {
 		p.nextToken()

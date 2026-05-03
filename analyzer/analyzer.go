@@ -12,8 +12,10 @@ import (
 )
 
 type Analyzer struct {
-	env    *environment.Environment
-	errors []string
+	env           *environment.Environment
+	errors        []string
+	structMethods map[string]map[string]bool
+	interfaces    map[string][]*ast.MethodSignature
 }
 
 func New(env *environment.Environment) *Analyzer {
@@ -90,8 +92,10 @@ func New(env *environment.Environment) *Analyzer {
 	env.Set("map", "type", environment.PUBLIC, true)
 
 	return &Analyzer{
-		env:    env,
-		errors: []string{},
+		env:           env,
+		errors:        []string{},
+		structMethods: make(map[string]map[string]bool),
+		interfaces:    make(map[string][]*ast.MethodSignature),
 	}
 }
 
@@ -99,8 +103,9 @@ func (a *Analyzer) Errors() []string {
 	return a.errors
 }
 
-func (a *Analyzer) error(format string, args ...interface{}) {
-	a.errors = append(a.errors, fmt.Sprintf(format, args...))
+func (a *Analyzer) error(tok token.Token, format string, args ...interface{}) {
+	msg := fmt.Sprintf(format, args...)
+	a.errors = append(a.errors, fmt.Sprintf("[%d:%d] %s", tok.Line, tok.Column, msg))
 }
 
 func (a *Analyzer) Analyze(node ast.Node) string {
@@ -117,7 +122,8 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 		filename := n.Path.Value
 		input, err := ioutil.ReadFile(filename)
 		if err != nil {
-			a.error("could not read imported file %s: %s", filename, err)
+			// No token available for file-level error
+			a.errors = append(a.errors, fmt.Sprintf("could not read imported file %s: %s", filename, err))
 			return ""
 		}
 		
@@ -126,7 +132,7 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 		program := p.ParseProgram()
 		
 		if len(p.Errors()) != 0 {
-			a.error("parser errors in imported file %s: %v", filename, p.Errors())
+			a.errors = append(a.errors, fmt.Sprintf("parser errors in imported file %s: %v", filename, p.Errors()))
 			return ""
 		}
 		
@@ -148,7 +154,7 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 			for _, imp := range n.Imports {
 				_, ok := a.env.Get(imp.Value)
 				if !ok {
-					a.error("imported symbol %s not found in module %s", imp.Value, filename)
+					a.error(imp.Token, "imported symbol %s not found in module %s", imp.Value, filename)
 				}
 				// We need a better way. Let's just bypass it for MVP.
 			}
@@ -166,12 +172,24 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 		typeName := n.Type
 		if typeName == "" {
 			typeName = valType
-		} else if typeName != valType && valType != "any" && valType != "array" && typeName != "any" {
-			a.error("type mismatch: cannot assign %s to %s", valType, typeName)
+		} else if typeName != valType && valType != "any" {
+			// Check if typeName is an interface
+			methods, isInterface := a.interfaces[typeName]
+			if isInterface {
+				// Check if valType (struct) implements all methods
+				structMethods := a.structMethods[valType]
+				for _, m := range methods {
+					if !structMethods[m.Name.Value] {
+						a.error(n.Token, "type %s does not implement interface %s: missing method %s", valType, typeName, m.Name.Value)
+					}
+				}
+			} else if valType != "array" && typeName != "any" {
+				a.error(n.Token, "type mismatch: cannot assign %s to %s", valType, typeName)
+			}
 		}
 		err := a.env.Set(n.Name.Value, typeName, environment.PUBLIC, false)
 		if err != nil {
-			a.error("%s", err.Error())
+			a.error(n.Name.Token, "%s", err.Error())
 		}
 		return typeName
 
@@ -181,18 +199,18 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 		if typeName == "" {
 			typeName = valType
 		} else if typeName != valType && valType != "any" && typeName != "any" {
-			a.error("type mismatch: cannot assign %s to %s", valType, typeName)
+			a.error(n.Token, "type mismatch: cannot assign %s to %s", valType, typeName)
 		}
 		err := a.env.Set(n.Name.Value, typeName, environment.PUBLIC, true)
 		if err != nil {
-			a.error("%s", err.Error())
+			a.error(n.Name.Token, "%s", err.Error())
 		}
 		return typeName
 
 	case *ast.Identifier:
 		sym, ok := a.env.Get(n.Value)
 		if !ok {
-			a.error("undefined variable: %s", n.Value)
+			a.error(n.Token, "undefined variable: %s", n.Value)
 			return "any"
 		}
 		return sym.Type
@@ -211,10 +229,12 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 
 	case *ast.InfixExpression:
 		if n.Operator == "." {
-			// Dot is valid on struct instances (type "type") and unknowns ("any")
+			// Dot is valid on struct instances, namespaces, and unknowns
 			leftType := a.Analyze(n.Left)
-			if leftType != "type" && leftType != "any" && leftType != "namespace" {
-				a.error("cannot use dot operator on type '%s' — only struct instances support field access", leftType)
+			// Any type that isn't one of the primitives is likely a struct instance
+			primitives := map[string]bool{"int": true, "float": true, "string": true, "bool": true, "thread": true, "interface": true}
+			if primitives[leftType] {
+				a.error(n.Token, "cannot use dot operator on type '%s' — only struct instances support field access", leftType)
 			}
 			return "any"
 		}
@@ -230,7 +250,7 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 		}
 
 		if leftType != rightType {
-			a.error("type mismatch in expression: %s %s %s", leftType, n.Operator, rightType)
+			a.error(n.Token, "type mismatch in expression: %s %s %s", leftType, n.Operator, rightType)
 			return "any"
 		}
 
@@ -289,6 +309,15 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 			funcEnv.Set(tp.Value, "type", environment.PUBLIC, true)
 		}
 
+		if n.Receiver != nil {
+			funcEnv.Set(n.Receiver.Name.Value, n.Receiver.Type, environment.PUBLIC, false)
+			// Track that this type has this method
+			if a.structMethods[n.Receiver.Type] == nil {
+				a.structMethods[n.Receiver.Type] = make(map[string]bool)
+			}
+			a.structMethods[n.Receiver.Type][n.Name.Value] = true
+		}
+
 		for _, p := range n.Parameters {
 			funcEnv.Set(p.Name.Value, p.Type, environment.PUBLIC, false)
 		}
@@ -305,7 +334,7 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 		if n.Parent != nil {
 			_, ok := a.env.Get(n.Parent.Value)
 			if !ok {
-				a.error("parent namespace %s not found", n.Parent.Value)
+				a.error(n.Parent.Token, "parent namespace %s not found", n.Parent.Value)
 			}
 		}
 
@@ -336,7 +365,15 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 		for _, arg := range n.Arguments {
 			a.Analyze(arg)
 		}
-		return "any" // In a full implementation, we'd look up the return type
+		
+		// If it's a struct constructor, return the struct name
+		if ident, ok := n.Function.(*ast.Identifier); ok {
+			sym, ok := a.env.Get(ident.Value)
+			if ok && sym.Type == "type" {
+				return ident.Value
+			}
+		}
+		return "any"
 
 	case *ast.SpawnExpression:
 		a.Analyze(n.Call)
@@ -367,6 +404,7 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 
 	case *ast.InterfaceStatement:
 		a.env.Set(n.Name.Value, "interface", environment.PUBLIC, true)
+		a.interfaces[n.Name.Value] = n.Methods
 		return "interface"
 
 	case *ast.EnumStatement:

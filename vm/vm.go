@@ -247,6 +247,21 @@ func (vm *VM) Run() error {
 				}
 				vm.sp = vm.sp - numArgs - 1
 				vm.push(instance)
+			case *object.BoundMethod:
+				if numArgs != fn.Method.NumParameters-1 {
+					return fmt.Errorf("wrong number of arguments for method: want=%d, got=%d", fn.Method.NumParameters-1, numArgs)
+				}
+				// Shift arguments up to make room for receiver
+				for i := vm.sp; i > vm.sp-numArgs; i-- {
+					vm.stack[i] = vm.stack[i-1]
+				}
+				vm.stack[vm.sp-numArgs] = fn.Receiver
+				vm.sp++
+
+				frame := NewFrame(fn.Method.Instructions, vm.sp-numArgs-1)
+				vm.pushFrame(frame)
+				vm.sp = frame.basePointer + fn.Method.NumLocals
+
 			case *object.CompiledFunction:
 				if numArgs != fn.NumParameters {
 					return fmt.Errorf("wrong number of arguments: want=%d, got=%d", fn.NumParameters, numArgs)
@@ -378,7 +393,17 @@ func (vm *VM) Run() error {
 			switch inst := instance.(type) {
 			case *object.StructInstance:
 				val, ok := inst.Fields[fieldName]
-				if !ok { vm.push(object.NULL) } else { vm.push(val) }
+				if ok {
+					vm.push(val)
+				} else {
+					// Check methods
+					method, ok := inst.Definition.Methods[fieldName]
+					if ok {
+						vm.push(&object.BoundMethod{Receiver: instance, Method: method})
+					} else {
+						vm.push(object.NULL)
+					}
+				}
 			case *object.Map:
 				val, ok := inst.Pairs[fieldName]
 				if !ok { vm.push(object.NULL) } else { vm.push(val) }
@@ -450,12 +475,27 @@ func (vm *VM) executeBinaryArithmetic(op code.Opcode) error {
 	right := vm.pop()
 	left := vm.pop()
 
-	if left.Type() == object.STRING_OBJ && right.Type() == object.STRING_OBJ {
+	if left.Type() == object.STRING_OBJ || right.Type() == object.STRING_OBJ {
 		if op != code.OpAdd {
 			return fmt.Errorf("unknown operator %d for strings", op)
 		}
-		leftVal := left.(*object.String).Value
-		rightVal := right.(*object.String).Value
+		var leftVal, rightVal string
+		if left.Type() == object.STRING_OBJ {
+			leftVal = left.(*object.String).Value
+		} else if left.Type() == object.INTEGER_OBJ {
+			leftVal = fmt.Sprintf("%d", left.(*object.Integer).Value)
+		} else {
+			leftVal = left.Inspect()
+		}
+		
+		if right.Type() == object.STRING_OBJ {
+			rightVal = right.(*object.String).Value
+		} else if right.Type() == object.INTEGER_OBJ {
+			rightVal = fmt.Sprintf("%d", right.(*object.Integer).Value)
+		} else {
+			rightVal = right.Inspect()
+		}
+		
 		return vm.push(&object.String{Value: leftVal + rightVal})
 	}
 
