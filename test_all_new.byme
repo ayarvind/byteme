@@ -1,0 +1,85 @@
+import "lib/time.byme"
+import "lib/set.byme"
+import "lib/map.byme"
+import "lib/algorithm.byme"
+
+println("=== ByteMe Extended Standard Library Test ===");
+
+// ── 1. Higher-Order Functions ──────────────────────────────────────────────
+println("\n1. Functional Programming:");
+let nums = [1, 2, 3, 4, 5];
+println("   Original :", nums);
+
+let doubled = Algorithm.map(nums, fn(x: any) { return x * 2; });
+println("   Map (*2) :", doubled);
+
+let evens = Algorithm.filter(nums, fn(x: any) { return x % 2 == 0; });
+println("   Filter (even) :", evens);
+
+let sum = Algorithm.reduce(nums, fn(acc: any, x: any) { return acc + x; }, 0);
+println("   Reduce (sum)  :", sum);
+
+println("   Every (>0)    :", Algorithm.every(nums, fn(x: any) { return x > 0; }));
+println("   Some (>4)     :", Algorithm.some(nums, fn(x: any) { return x > 4; }));
+
+// ── 2. Advanced Sorting ────────────────────────────────────────────────────
+println("\n2. Advanced Sorting:");
+struct Person {
+    name: string,
+    age: int
+}
+
+let people = [
+    Person("Alice", 30),
+    Person("Bob", 20),
+    Person("Charlie", 25)
+];
+println("   Original :", people);
+
+// Sort by age
+Algorithm.sort(people, fn(a: any, b: any) {
+    return a.age < b.age;
+});
+println("   Sorted by age :", people);
+
+// ── 3. Set Module ──────────────────────────────────────────────────────────
+println("\n3. Set Module:");
+let setA = Set.new();
+Set.add(setA, "Apple");
+Set.add(setA, "Banana");
+Set.add(setA, "Apple"); // Duplicate
+println("   Set A :", Set.toArray(setA));
+
+let setB = Set.new();
+Set.add(setB, "Banana");
+Set.add(setB, "Cherry");
+println("   Set B :", Set.toArray(setB));
+
+let union = Set.union(setA, setB);
+println("   Union :", Set.toArray(union));
+
+let intersection = Set.intersect(setA, setB);
+println("   Intersection :", Set.toArray(intersection));
+
+// ── 4. Map Module ──────────────────────────────────────────────────────────
+println("\n4. Map Module:");
+let myMap = Map.new();
+Map.put(myMap, "ID", 101);
+Map.put(myMap, "Status", "Active");
+println("   Map Size :", Map.size(myMap));
+println("   ID       :", Map.get(myMap, "ID"));
+Map.remove(myMap, "Status");    
+println("   Keys after remove :", Map.keys(myMap));
+
+// ── 5. Time Module ─────────────────────────────────────────────────────────
+println("\n5. Time Module:");
+let now = Time.now();
+println("   Current Unix :", now);
+let fmt = Time.format(now, Time.RFC3339);
+println("   RFC3339      :", fmt);
+
+let parsed = Time.parse(Time.DATE_ONLY, "2024-12-25");
+println("   Parsed Christmas 2024 (Unix) :", parsed);
+println("   Re-formatted :", Time.format(parsed, "January 2, 2006"));
+
+println("\n=== Extended STL Test Complete ===");

@@ -714,33 +714,49 @@ func (p *Parser) parseAsyncFunctionLiteral() ast.Expression {
 func (p *Parser) parseFunctionLiteral() ast.Expression {
 	lit := &ast.FunctionLiteral{Token: p.curToken}
 
-	if p.peekTokenIs(token.LPAREN) {
-		p.nextToken() // cur is (
-		p.nextToken() // cur is receiver name
-		recvName := &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
-		if !p.expectPeek(token.COLON) { return nil }
-		p.nextToken() // cur is receiver type
-		recvType := p.curToken.Literal
-		if !p.expectPeek(token.RPAREN) { return nil }
-		lit.Receiver = &ast.Parameter{Name: recvName, Type: recvType}
-	}
-
+	// 1. Optional Name
 	if p.peekTokenIs(token.IDENT) {
 		p.nextToken()
 		lit.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
 	}
 
+	// 2. Optional Type Parameters
 	if p.peekTokenIs(token.LT) {
 		p.nextToken()
 		lit.TypeParameters = p.parseTypeParameters()
 	}
 
+	// 3. Parameters (and possibly Receiver)
 	if !p.expectPeek(token.LPAREN) {
 		return nil
 	}
+	
+	params := p.parseFunctionParameters()
+	
+	// If followed by ANOTHER '(' or an IDENT (if we didn't have a name yet), 
+	// then the first part was a receiver.
+	if p.peekTokenIs(token.LPAREN) || (lit.Name == nil && p.peekTokenIs(token.IDENT)) {
+		// The 'params' we just parsed is actually the Receiver
+		if len(params) > 0 {
+			lit.Receiver = params[0]
+		}
+		
+		// Now parse the name if we haven't yet
+		if p.peekTokenIs(token.IDENT) {
+			p.nextToken()
+			lit.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+		}
+		
+		// Now parse the real parameters
+		if !p.expectPeek(token.LPAREN) {
+			return nil
+		}
+		lit.Parameters = p.parseFunctionParameters()
+	} else {
+		lit.Parameters = params
+	}
 
-	lit.Parameters = p.parseFunctionParameters()
-
+	// 4. Optional Return Type
 	if p.peekTokenIs(token.ARROW) {
 		p.nextToken() // cur is ->
 		if !p.expectPeek(token.IDENT) { return nil }
@@ -756,6 +772,7 @@ func (p *Parser) parseFunctionLiteral() ast.Expression {
 		lit.ReturnType = retType
 	}
 
+	// 5. Body
 	if !p.expectPeek(token.LBRACE) {
 		return nil
 	}

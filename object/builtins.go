@@ -46,7 +46,7 @@ var Builtins = []*Builtin{
 	},
 	{ // 2: timeNow
 		Fn: func(args ...Object) Object {
-			return &Integer{Value: time.Now().UnixMilli()}
+			return &Integer{Value: time.Now().Unix()}
 		},
 	},
 	{ // 3: jsonParse
@@ -75,9 +75,9 @@ var Builtins = []*Builtin{
 	{ // 5: timeSleep
 		Fn: func(args ...Object) Object {
 			if len(args) != 1 { return NULL }
-			ms, ok := args[0].(*Integer)
+			seconds, ok := args[0].(*Integer)
 			if !ok { return NULL }
-			time.Sleep(time.Duration(ms.Value) * time.Millisecond)
+			time.Sleep(time.Duration(seconds.Value) * time.Second)
 			return NULL
 		},
 	},
@@ -87,7 +87,7 @@ var Builtins = []*Builtin{
 			ts, ok := args[0].(*Integer)
 			layout, ok2 := args[1].(*String)
 			if !ok || !ok2 { return NULL }
-			t := time.UnixMilli(ts.Value)
+			t := time.Unix(ts.Value, 0)
 			return &String{Value: t.Format(layout.Value)}
 		},
 	},
@@ -929,15 +929,107 @@ var Builtins = []*Builtin{
 	},
 	{ // 87: arraySort
 		Fn: func(args ...Object) Object {
-			if len(args) != 1 { return NULL }
+			if len(args) < 1 { return NULL }
 			arr, ok := args[0].(*Array)
 			if !ok { return NULL }
 			
-			sort.Slice(arr.Elements, func(i, j int) bool {
-				// Simple lexicographical sort based on Inspect() for now
-				return arr.Elements[i].Inspect() < arr.Elements[j].Inspect()
-			})
+			if len(args) == 1 {
+				sort.Slice(arr.Elements, func(i, j int) bool {
+					// Default: Try numeric comparison first, then string
+					if l, ok1 := arr.Elements[i].(*Integer); ok1 {
+						if r, ok2 := arr.Elements[j].(*Integer); ok2 {
+							return l.Value < r.Value
+						}
+					}
+					if l, ok1 := arr.Elements[i].(*Float); ok1 {
+						if r, ok2 := arr.Elements[j].(*Float); ok2 {
+							return l.Value < r.Value
+						}
+					}
+					return arr.Elements[i].Inspect() < arr.Elements[j].Inspect()
+				})
+			} else {
+				// Custom comparator
+				comp := args[1]
+				sort.Slice(arr.Elements, func(i, j int) bool {
+					var res Object
+					switch fn := comp.(type) {
+					case *CompiledFunction:
+						res = RunFunction(fn, *vmConstantsPtr, *vmGlobalsPtr, []Object{arr.Elements[i], arr.Elements[j]})
+					case *Builtin:
+						res = fn.Fn(arr.Elements[i], arr.Elements[j])
+					default:
+						return false
+					}
+					if b, ok := res.(*Boolean); ok {
+						return b.Value
+					}
+					return false
+				})
+			}
 			return arr
+		},
+	},
+	{ // 88: mapDelete
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 { return NULL }
+			m, ok := args[0].(*Map)
+			if !ok { return NULL }
+			key := args[1].Inspect()
+			delete(m.Pairs, key)
+			return m
+		},
+	},
+	{ // 89: mapKeys
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			m, ok := args[0].(*Map)
+			if !ok { return NULL }
+			keys := make([]Object, 0, len(m.Pairs))
+			// Since our Map stores keys by string Inspect() representation, 
+			// we can't easily recover the original objects if they weren't strings.
+			// But for now, returning string keys is better than nothing.
+			for k := range m.Pairs {
+				keys = append(keys, &String{Value: k})
+			}
+			return &Array{Elements: keys}
+		},
+	},
+	{ // 90: mapValues
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			m, ok := args[0].(*Map)
+			if !ok { return NULL }
+			vals := make([]Object, 0, len(m.Pairs))
+			for _, v := range m.Pairs {
+				vals = append(vals, v)
+			}
+			return &Array{Elements: vals}
+		},
+	},
+	{ // 91: timeParse
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 { return NULL }
+			layout, ok1 := args[0].(*String)
+			value, ok2 := args[1].(*String)
+			if !ok1 || !ok2 { return NULL }
+			
+			t, err := time.Parse(layout.Value, value.Value)
+			if err != nil {
+				return &Error{Message: err.Error()}
+			}
+			// Return Unix timestamp as Integer
+			return &Integer{Value: t.Unix()}
+		},
+	},
+	{ // 92: strReplaceAll
+		Fn: func(args ...Object) Object {
+			if len(args) != 3 { return NULL }
+			s, ok1 := args[0].(*String)
+			oldS, ok2 := args[1].(*String)
+			newS, ok3 := args[2].(*String)
+			if !ok1 || !ok2 || !ok3 { return NULL }
+			return &String{Value: strings.ReplaceAll(s.Value, oldS.Value, newS.Value)}
 		},
 	},
 }

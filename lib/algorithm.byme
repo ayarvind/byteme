@@ -3,15 +3,87 @@
 
 public namespace Algorithm {
 
-    // Sorts an array in-place
-    public fn sort(arr) {
-        return arraySort(arr);
+    // Sorts an array in-place. Accepts optional comparator function.
+    public fn sort(arr, comparator) {
+        if (comparator == null) {
+            return arraySort(arr);
+        }
+        return arraySort(arr, comparator);
     }
 
-    // Returns a new sorted array
-    public fn sorted(arr) {
+    // Returns a new sorted array. Accepts optional comparator function.
+    public fn sorted(arr, comparator) {
         let newArr = arraySlice(arr, 0, len(arr));
-        return arraySort(newArr);
+        if (comparator == null) {
+            return arraySort(newArr);
+        }
+        return arraySort(newArr, comparator);
+    }
+
+    // ── Functional Programming (Higher-Order Functions) ────────────────────
+
+    // Transforms an array using a callback function
+    public fn map(arr, callback) {
+        let res = [];
+        let i = 0;
+        let n = len(arr);
+        while (i < n) {
+            arrayPush(res, callback(arr[i]));
+            i = i + 1;
+        }
+        return res;
+    }
+
+    // Filters an array based on a predicate function
+    public fn filter(arr, predicate) {
+        let res = [];
+        let i = 0;
+        let n = len(arr);
+        while (i < n) {
+            if (predicate(arr[i])) {
+                arrayPush(res, arr[i]);
+            }
+            i = i + 1;
+        }
+        return res;
+    }
+
+    // Reduces an array to a single value using an accumulator function
+    public fn reduce(arr, callback, initial) {
+        let acc = initial;
+        let i = 0;
+        let n = len(arr);
+        while (i < n) {
+            acc = callback(acc, arr[i]);
+            i = i + 1;
+        }
+        return acc;
+    }
+
+    // Returns true if all elements satisfy the predicate
+    public fn every(arr, predicate) {
+        let i = 0;
+        let n = len(arr);
+        while (i < n) {
+            if (!predicate(arr[i])) {
+                return false;
+            }
+            i = i + 1;
+        }
+        return true;
+    }
+
+    // Returns true if at least one element satisfies the predicate
+    public fn some(arr, predicate) {
+        let i = 0;
+        let n = len(arr);
+        while (i < n) {
+            if (predicate(arr[i])) {
+                return true;
+            }
+            i = i + 1;
+        }
+        return false;
     }
 
     // Performs a linear search, returns index or -1

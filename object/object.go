@@ -170,15 +170,21 @@ type BoundMethod struct {
 func (bm *BoundMethod) Type() ObjectType { return "BOUND_METHOD" }
 func (bm *BoundMethod) Inspect() string  { return fmt.Sprintf("BoundMethod[%p]", bm.Method) }
 
-type Map struct {
-	Pairs map[string]Object
+type MapPair struct {
+	Key   Object
+	Value Object
 }
+
+type Map struct {
+	Pairs map[string]MapPair
+}
+
 func (m *Map) Type() ObjectType { return MAP_OBJ }
 func (m *Map) Inspect() string {
 	var out bytes.Buffer
 	out.WriteString("{")
-	for k, v := range m.Pairs {
-		out.WriteString(fmt.Sprintf("%s: %s, ", k, v.Inspect()))
+	for _, pair := range m.Pairs {
+		out.WriteString(fmt.Sprintf("%s: %s, ", pair.Key.Inspect(), pair.Value.Inspect()))
 	}
 	out.WriteString("}")
 	return out.String()

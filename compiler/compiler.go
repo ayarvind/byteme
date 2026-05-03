@@ -606,6 +606,12 @@ func (c *Compiler) Compile(node ast.Node) error {
 					aliasSym.Name = structLit.Name.Value
 					c.symbolTable.store[structLit.Name.Value] = aliasSym
 				}
+			case *ast.ConstStatement:
+				compoundName := nsName + "." + s.Name.Value
+				sym := c.symbolTable.Define(compoundName)
+				aliasSym := sym
+				aliasSym.Name = s.Name.Value
+				c.symbolTable.store[s.Name.Value] = aliasSym
 			}
 		}
 
@@ -613,6 +619,18 @@ func (c *Compiler) Compile(node ast.Node) error {
 		for _, stmt := range n.Body.Statements {
 			switch s := stmt.(type) {
 			case *ast.LetStatement:
+				compoundName := nsName + "." + s.Name.Value
+				err := c.Compile(s.Value)
+				if err != nil { return err }
+				
+				sym, _ := c.symbolTable.Resolve(compoundName)
+				if sym.Scope == GlobalScope {
+					c.emit(code.OpSetGlobal, sym.Index)
+				} else {
+					c.emit(code.OpSetLocal, sym.Index)
+				}
+
+			case *ast.ConstStatement:
 				compoundName := nsName + "." + s.Name.Value
 				err := c.Compile(s.Value)
 				if err != nil { return err }
@@ -790,11 +808,16 @@ var builtins = map[string]int{
 	"arrayPop":     85,
 	"arraySlice":    86,
 	"arraySort":    87,
-	"httpHandle":   88,
-	"httpServe":    89,
-	"httpGet":      90,
-	"httpPost":     91,
-	"httpResponse": 92,
+	"mapDelete":    88,
+	"mapKeys":      89,
+	"mapValues":    90,
+	"timeParse":    91,
+	"strReplaceAll": 92,
+	"httpHandle":   93,
+	"httpServe":    94,
+	"httpGet":      95,
+	"httpPost":     96,
+	"httpResponse": 97,
 }
 
 func (c *Compiler) Bytecode() *Bytecode {
