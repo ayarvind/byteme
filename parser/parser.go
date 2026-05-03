@@ -58,6 +58,7 @@ func (p *Parser) registerParsers() {
 	p.registerPrefix(token.ASYNC, p.parseAsyncFunctionLiteral)
 	p.registerPrefix(token.SPAWN, p.parseSpawnExpression)
 	p.registerPrefix(token.AWAIT, p.parseAwaitExpression)
+	p.registerPrefix(token.NULL, p.parseNull)
 
 	p.infixParseFns = make(map[token.TokenType]infixParseFn)
 	p.registerInfix(token.PLUS, p.parseInfixExpression)
@@ -550,6 +551,10 @@ func (p *Parser) parseExpression(precedence int) ast.Expression {
 	}
 
 	return leftExp
+}
+
+func (p *Parser) parseNull() ast.Expression {
+	return &ast.NullLiteral{Token: p.curToken}
 }
 
 func (p *Parser) parseIdentifier() ast.Expression {

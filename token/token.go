@@ -70,6 +70,7 @@ const (
 	ENUM      TokenType = "ENUM"
 	IMPORT    TokenType = "IMPORT"
 	FROM      TokenType = "FROM"
+	NULL      TokenType = "NULL"
 )
 
 type Token struct {
@@ -106,6 +107,7 @@ var keywords = map[string]TokenType{
 	"enum":      ENUM,
 	"import":    IMPORT,
 	"from":      FROM,
+	"null":      NULL,
 	"@":         AT,
 }
 

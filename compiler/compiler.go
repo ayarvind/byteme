@@ -147,6 +147,47 @@ func (c *Compiler) Compile(node ast.Node) error {
 			return nil
 		}
 
+		if n.Operator == "=" {
+			// Left side is what we are assigning to
+			switch left := n.Left.(type) {
+			case *ast.Identifier:
+				err := c.Compile(n.Right)
+				if err != nil { return err }
+
+				symbol, ok := c.symbolTable.Resolve(left.Value)
+				if !ok {
+					return fmt.Errorf("undefined variable: %s", left.Value)
+				}
+				if symbol.Scope == GlobalScope {
+					c.emit(code.OpSetGlobal, symbol.Index)
+				} else {
+					c.emit(code.OpSetLocal, symbol.Index)
+				}
+				c.emit(code.OpNull)
+				return nil
+			case *ast.InfixExpression: // Dot access like `head.next = ...`
+				if left.Operator == "." {
+					if ident, ok := left.Right.(*ast.Identifier); ok {
+						err := c.Compile(left.Left) // Push the struct instance FIRST
+						if err != nil { return err }
+
+						err = c.Compile(n.Right) // Push the value SECOND
+						if err != nil { return err }
+
+						fieldNameIdx := c.addConstant(&object.String{Value: ident.Value})
+						c.emit(code.OpSetField, fieldNameIdx)
+						
+						// OpSetField pushes the instance back. 
+						// If we don't emit anything else, the ExpressionStatement will OpPop the instance, leaving stack balanced.
+						return nil
+					}
+				}
+				return fmt.Errorf("invalid assignment target")
+			default:
+				return fmt.Errorf("invalid assignment target")
+			}
+		}
+
 		// Reordering for LessThan logic
 		if n.Operator == "<" {
 			err := c.Compile(n.Right)
@@ -217,6 +258,9 @@ func (c *Compiler) Compile(node ast.Node) error {
 			c.emit(code.OpFalse)
 		}
 
+	case *ast.NullLiteral:
+		c.emit(code.OpNull)
+
 	case *ast.ArrayLiteral:
 		for _, el := range n.Elements {
 			err := c.Compile(el)
@@ -266,6 +310,22 @@ func (c *Compiler) Compile(node ast.Node) error {
 			c.changeOperand(jumpPos, afterAlternativePos)
 		}
 		return nil
+
+	case *ast.WhileStatement:
+		startPos := len(c.instructions)
+		err := c.Compile(n.Condition)
+		if err != nil { return err }
+
+		jumpNotTruthyPos := c.emit(code.OpJumpNotTruthy, 9999)
+
+		err = c.Compile(n.Body)
+		if err != nil { return err }
+
+		c.emit(code.OpJump, startPos)
+
+		afterWhilePos := len(c.instructions)
+		c.changeOperand(jumpNotTruthyPos, afterWhilePos)
+		c.emit(code.OpNull) // Ensure expression statement balanced
 
 	case *ast.BlockStatement:
 		for _, s := range n.Statements {
@@ -476,10 +536,27 @@ func (c *Compiler) Compile(node ast.Node) error {
 		// Compile each function/var in the body under "NamespaceName.memberName"
 		for _, stmt := range n.Body.Statements {
 			switch s := stmt.(type) {
+			case *ast.LetStatement:
+				compoundName := nsName + "." + s.Name.Value
+				err := c.Compile(s.Value)
+				if err != nil { return err }
+				
+				sym := c.symbolTable.Define(compoundName)
+				if sym.Scope == GlobalScope {
+					c.emit(code.OpSetGlobal, sym.Index)
+				} else {
+					c.emit(code.OpSetLocal, sym.Index)
+				}
+				
+				// Alias for internal usage
+				aliasSym := sym
+				aliasSym.Name = s.Name.Value
+				c.symbolTable.store[s.Name.Value] = aliasSym
+
 			case *ast.ExpressionStatement:
 				if fnLit, ok := s.Expression.(*ast.FunctionLiteral); ok && fnLit.Name != nil {
 					compoundName := nsName + "." + fnLit.Name.Value
-					// Compile the function body into a CompiledFunction
+					
 					enclosedCompiler := NewEnclosedCompiler(c)
 					for _, p := range fnLit.Parameters {
 						enclosedCompiler.symbolTable.Define(p.Name.Value)
@@ -501,6 +578,11 @@ func (c *Compiler) Compile(node ast.Node) error {
 					} else {
 						c.emit(code.OpSetLocal, sym.Index)
 					}
+					
+					// Alias for internal usage
+					aliasSym := sym
+					aliasSym.Name = fnLit.Name.Value
+					c.symbolTable.store[fnLit.Name.Value] = aliasSym
 				}
 			}
 		}

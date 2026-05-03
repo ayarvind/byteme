@@ -12,7 +12,7 @@ public namespace Trie {
     public fn insert(word: string) {
         let curr = root;
         let i = 0;
-        let n = arrayLen(word);
+        let n = len(word);
 
         while (i < n) {
             let char = charAt(word, i);
@@ -32,7 +32,7 @@ public namespace Trie {
     public fn search(word: string) -> bool {
         let curr = root;
         let i = 0;
-        let n = arrayLen(word);
+        let n = len(word);
 
         while (i < n) {
             let char = charAt(word, i);
@@ -48,7 +48,7 @@ public namespace Trie {
     public fn startsWith(prefix: string) -> bool {
         let curr = root;
         let i = 0;
-        let n = arrayLen(prefix);
+        let n = len(prefix);
 
         while (i < n) {
             let char = charAt(prefix, i);

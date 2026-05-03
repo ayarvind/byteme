@@ -226,6 +226,13 @@ func (bl *BooleanLiteral) expressionNode()      {}
 func (bl *BooleanLiteral) TokenLiteral() string { return bl.Token.Literal }
 func (bl *BooleanLiteral) String() string       { return bl.Token.Literal }
 
+type NullLiteral struct {
+	Token token.Token
+}
+func (nl *NullLiteral) expressionNode()      {}
+func (nl *NullLiteral) TokenLiteral() string { return nl.Token.Literal }
+func (nl *NullLiteral) String() string       { return nl.Token.Literal }
+
 type ArrayLiteral struct {
 	Token    token.Token // [
 	Elements []Expression

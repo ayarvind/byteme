@@ -219,6 +219,9 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 	case *ast.IntegerLiteral:
 		return "int"
 
+	case *ast.NullLiteral:
+		return "any"
+
 	case *ast.FloatLiteral:
 		return "float"
 

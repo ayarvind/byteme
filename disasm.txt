@@ -1,0 +1,150 @@
+Main Bytecode:
+0000 OpStructDef 0
+0003 OpSetGlobal 0
+0006 OpNull
+0007 OpPop
+0008 OpNull
+0009 OpSetGlobal 1
+0012 OpNull
+0013 OpSetGlobal 2
+0016 OpConstant 3
+0019 OpSetGlobal 3
+0022 OpConstant 5
+0025 OpSetGlobal 4
+0028 OpConstant 11
+0031 OpSetGlobal 5
+0034 OpConstant 14
+0037 OpSetGlobal 6
+0040 OpNull
+0041 OpPop
+0042 OpGetBuiltin 0
+0044 OpConstant 15
+0047 OpCall 1
+0049 OpPop
+0050 OpGetGlobal 3
+0053 OpConstant 16
+0056 OpCall 1
+0058 OpPop
+0059 OpGetGlobal 3
+0062 OpConstant 17
+0065 OpCall 1
+0067 OpPop
+0068 OpGetGlobal 3
+0071 OpConstant 18
+0074 OpCall 1
+0076 OpPop
+0077 OpGetBuiltin 0
+0079 OpConstant 19
+0082 OpCall 1
+0084 OpPop
+0085 OpGetGlobal 4
+0088 OpConstant 20
+0091 OpCall 1
+0093 OpPop
+0094 OpGetGlobal 6
+0097 OpCall 0
+0099 OpPop
+0100 OpGetBuiltin 0
+0102 OpConstant 21
+0105 OpCall 1
+0107 OpPop
+0108 OpGetGlobal 5
+0111 OpConstant 22
+0114 OpCall 1
+0116 OpPop
+0117 OpGetGlobal 6
+0120 OpCall 0
+0122 OpPop
+0123 OpGetBuiltin 0
+0125 OpConstant 23
+0128 OpCall 1
+0130 OpPop
+0131 OpGetGlobal 5
+0134 OpConstant 24
+0137 OpCall 1
+0139 OpPop
+0140 OpGetGlobal 6
+0143 OpCall 0
+0145 OpPop
+
+
+Constant Function 3:
+0000 OpGetGlobal 0
+0003 OpGetLocal 0
+0005 OpNull
+0006 OpCall 2
+0008 OpSetLocal 1
+0010 OpGetGlobal 2
+0013 OpNull
+0014 OpEqual
+0015 OpJumpNotTruthy 28
+0018 OpGetLocal 1
+0020 OpSetGlobal 2
+0023 OpNull
+0024 OpPop
+0025 OpJump 42
+0028 OpGetGlobal 2
+0031 OpSetLocal 2
+0033 OpGetLocal 1
+0035 OpGetLocal 2
+0037 OpSetField 1
+0040 OpNull
+0041 OpPop
+0042 OpPop
+0043 OpConstant 2
+0046 OpReturnValue
+
+
+Constant Function 5:
+0000 OpGetGlobal 0
+0003 OpGetLocal 0
+0005 OpGetGlobal 2
+0008 OpCall 2
+0010 OpSetLocal 1
+0012 OpGetLocal 1
+0014 OpSetGlobal 2
+0017 OpNull
+0018 OpPop
+0019 OpConstant 4
+0022 OpReturnValue
+
+
+Constant Function 11:
+0000 OpGetGlobal 2
+0003 OpNull
+0004 OpEqual
+0005 OpJumpNotTruthy 12
+0008 OpConstant 6
+0011 OpReturnValue
+0012 OpNull
+0013 OpPop
+0014 OpGetGlobal 2
+0017 OpGetField 7
+0020 OpGetLocal 0
+0022 OpEqual
+0023 OpJumpNotTruthy 41
+0026 OpGetGlobal 2
+0029 OpGetField 8
+0032 OpSetGlobal 2
+0035 OpNull
+0036 OpPop
+0037 OpConstant 9
+0040 OpReturnValue
+0041 OpNull
+0042 OpPop
+0043 OpGetGlobal 2
+0046 OpSetLocal 1
+0048 OpConstant 10
+0051 OpReturnValue
+
+
+Constant Function 14:
+0000 OpGetGlobal 2
+0003 OpSetLocal 0
+0005 OpGetBuiltin 0
+0007 OpConstant 12
+0010 OpCall 1
+0012 OpPop
+0013 OpConstant 13
+0016 OpReturnValue
+
