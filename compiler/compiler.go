@@ -197,6 +197,28 @@ func (c *Compiler) Compile(node ast.Node) error {
 			c.emit(code.OpGreaterThan)
 			return nil
 		}
+		
+		if n.Operator == "<=" {
+			// left <= right  -> !(left > right)
+			err := c.Compile(n.Left)
+			if err != nil { return err }
+			err = c.Compile(n.Right)
+			if err != nil { return err }
+			c.emit(code.OpGreaterThan)
+			c.emit(code.OpBang)
+			return nil
+		}
+
+		if n.Operator == ">=" {
+			// left >= right -> !(left < right) -> !(right > left)
+			err := c.Compile(n.Right)
+			if err != nil { return err }
+			err = c.Compile(n.Left)
+			if err != nil { return err }
+			c.emit(code.OpGreaterThan)
+			c.emit(code.OpBang)
+			return nil
+		}
 
 		err := c.Compile(n.Left)
 		if err != nil {
