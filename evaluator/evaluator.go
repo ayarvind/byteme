@@ -374,6 +374,15 @@ func Eval(node ast.Node, env *environment.Environment) object.Object {
 
 	case *ast.StructLiteral:
 		structLit := &object.StructLiteral{Name: n.Name.Value, Fields: n.Fields}
+		
+		if n.Parent != nil {
+			if parentObj, ok := env.GetVal("@struct_" + n.Parent.Value); ok {
+				if parentLit, ok := parentObj.(*object.StructLiteral); ok {
+					structLit.Parent = parentLit
+				}
+			}
+		}
+
 		// Register constructor: struct name is a function
 		constructor := &object.Builtin{
 			Fn: func(args ...object.Object) object.Object {
@@ -381,7 +390,23 @@ func Eval(node ast.Node, env *environment.Environment) object.Object {
 					Definition: structLit,
 					Fields:     make(map[string]object.Object),
 				}
-				for i, field := range structLit.Fields {
+				
+				// Collect all fields from hierarchy
+				var getAllFields func(*object.StructLiteral) []*ast.Parameter
+				getAllFields = func(s *object.StructLiteral) []*ast.Parameter {
+					if s.Parent == nil {
+						return s.Fields
+					}
+					return append(getAllFields(s.Parent), s.Fields...)
+				}
+				
+				allFields := getAllFields(structLit)
+				
+				if len(args) > len(allFields) {
+					return &object.Error{Message: fmt.Sprintf("struct %s requires %d fields, got %d", structLit.Name, len(allFields), len(args))}
+				}
+
+				for i, field := range allFields {
 					if i < len(args) {
 						instance.Fields[field.Name.Value] = args[i]
 					} else {
@@ -392,6 +417,7 @@ func Eval(node ast.Node, env *environment.Environment) object.Object {
 			},
 		}
 		env.SetVal(n.Name.Value, constructor)
+		env.SetVal("@struct_" + n.Name.Value, structLit)
 		return structLit
 
 	case *ast.SpawnExpression:

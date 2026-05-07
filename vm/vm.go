@@ -25,6 +25,7 @@ type VM struct {
 	framesIndex int
 
 	catchHandlers []*CatchHandler
+	structs       map[string]*object.StructLiteral
 }
 
 type CatchHandler struct {
@@ -57,29 +58,27 @@ func New(bytecode *compiler.Bytecode) *VM {
 		constants:     bytecode.Constants,
 		globals:       make([]object.Object, GlobalsSize),
 		stack:         make([]object.Object, StackSize),
-		sp:            bytecode.NumLocals,
+		sp:            0, // Start sp at 0, main frame will handle its locals
 		frames:        frames,
 		framesIndex:   1,
-		catchHandlers: make([]*CatchHandler, 0),
+		catchHandlers: []*CatchHandler{},
+		structs:       make(map[string]*object.StructLiteral),
 	}
 	vm.registerRunner()
 	return vm
 }
 
 func NewWithGlobalStore(constants []object.Object, globals []object.Object) *VM {
-	frames := make([]*Frame, MaxFrames)
-	frames[0] = NewFrame(&object.Closure{Fn: &object.CompiledFunction{Instructions: code.Instructions{}}}, 0)
-
 	vm := &VM{
 		constants:     constants,
 		globals:       globals,
 		stack:         make([]object.Object, StackSize),
 		sp:            0,
-		frames:        frames,
-		framesIndex:   1,
-		catchHandlers: make([]*CatchHandler, 0),
+		frames:        make([]*Frame, MaxFrames),
+		framesIndex:   0,
+		catchHandlers: []*CatchHandler{},
+		structs:       make(map[string]*object.StructLiteral),
 	}
-	vm.registerRunner()
 	return vm
 }
 
@@ -371,7 +370,17 @@ func (vm *VM) Run() error {
 			// Push the StructLiteral (type definition) from the constant pool
 			constIdx := int(binary.BigEndian.Uint16(ins[ip+1:]))
 			vm.currentFrame().ip += 2
-			err := vm.push(vm.constants[constIdx])
+			structLit := vm.constants[constIdx].(*object.StructLiteral)
+			
+			// Link parent if exists
+			if structLit.ParentName != "" {
+				if parent, ok := vm.structs[structLit.ParentName]; ok {
+					structLit.Parent = parent
+				}
+			}
+			
+			vm.structs[structLit.Name] = structLit
+			err := vm.push(structLit)
 			if err != nil { return err }
 
 		case code.OpGetField:
@@ -382,13 +391,33 @@ func (vm *VM) Run() error {
 			instance := vm.pop()
 			switch inst := instance.(type) {
 			case *object.StructInstance:
-				val, ok := inst.Fields[fieldName]
+				// Search fields in hierarchy
+				var val object.Object
+				var ok bool
+				
+				curr := inst
+				for curr != nil {
+					val, ok = curr.Fields[fieldName]
+					if ok { break }
+					// To check parent fields, we need to know the parent instance's layout?
+					// No, StructInstance currently stores ALL fields in a flat map.
+					// Wait, if it's flat, then inst.Fields[fieldName] should just work.
+					break
+				}
+				
 				if ok {
 					err := vm.push(val)
 					if err != nil { return err }
 				} else {
-					// Check methods
-					method, ok := inst.Definition.Methods[fieldName]
+					// Check methods recursively
+					var method *object.CompiledFunction
+					currDef := inst.Definition
+					for currDef != nil {
+						method, ok = currDef.Methods[fieldName]
+						if ok { break }
+						currDef = currDef.Parent
+					}
+					
 					if ok {
 						err := vm.push(&object.BoundMethod{Receiver: instance, Method: method})
 						if err != nil { return err }
@@ -571,15 +600,20 @@ func (vm *VM) executeCall(fn object.Object, numArgs int) error {
 		return vm.callBuiltin(callee, numArgs)
 	case *object.StructLiteral:
 		// Struct constructor: Point(x, y) → StructInstance{x: ..., y: ...}
-		if numArgs != len(callee.Fields) {
-			return fmt.Errorf("struct %s requires %d fields, got %d", callee.Name, len(callee.Fields), numArgs)
+		allFields := callee.GetAllFields()
+		if numArgs > len(allFields) {
+			return fmt.Errorf("struct %s requires %d fields, got %d", callee.Name, len(allFields), numArgs)
 		}
 		instance := &object.StructInstance{
 			Definition: callee,
 			Fields:     make(map[string]object.Object),
 		}
-		for i, field := range callee.Fields {
-			instance.Fields[field.Name.Value] = vm.stack[vm.sp-numArgs+i]
+		for i, field := range allFields {
+			if i < numArgs {
+				instance.Fields[field.Name.Value] = vm.stack[vm.sp-numArgs+i]
+			} else {
+				instance.Fields[field.Name.Value] = object.NULL
+			}
 		}
 		vm.sp = vm.sp - numArgs - 1
 		return vm.push(instance)

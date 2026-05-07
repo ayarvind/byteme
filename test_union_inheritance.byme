@@ -1,0 +1,29 @@
+struct Parent {
+    name: string
+}
+
+struct Child extends Parent {
+    age: int
+}
+
+fn main() {
+    // Subtyping test
+    let p: Parent = Child("Alice", 10);
+    println("Parent name:", p.name);
+    
+    // Field inheritance test
+    let c: Child = Child("Bob", 5);
+    println("Child name (inherited):", c.name);
+    println("Child age:", c.age);
+    
+    // Union type test
+    let x: int | string = 10;
+    println("Union x (int):", x);
+    x = "hello";
+    println("Union x (string):", x);
+    
+    // Error test: assignment
+    // let err: Child = Parent("Eve"); // This should fail analyzer
+}
+
+main();

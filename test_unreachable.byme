@@ -1,9 +1,0 @@
-fn test() {
-    println("Before");
-    return;
-    println("After");
-}
-fn main() {
-    test();
-}
-main();

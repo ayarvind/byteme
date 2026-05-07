@@ -550,6 +550,9 @@ func (c *Compiler) Compile(node ast.Node) error {
 				Name:   n.Name.Value,
 				Fields: fields,
 			}
+			if n.Parent != nil {
+				structDef.ParentName = n.Parent.Value
+			}
 			constIdx := c.addConstant(structDef)
 			c.emit(code.OpStructDef, constIdx)
 

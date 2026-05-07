@@ -155,12 +155,22 @@ func (b *Builtin) Type() ObjectType { return BUILTIN_OBJ }
 func (b *Builtin) Inspect() string  { return "builtin function" }
 
 type StructLiteral struct {
-	Name    string
-	Fields  []*ast.Parameter
-	Methods map[string]*CompiledFunction
+	Name       string
+	ParentName string
+	Parent     *StructLiteral
+	Fields     []*ast.Parameter
+	Methods    map[string]*CompiledFunction
 }
 func (s *StructLiteral) Type() ObjectType { return STRUCT_LITERAL_OBJ }
 func (s *StructLiteral) Inspect() string  { return fmt.Sprintf("struct %s", s.Name) }
+
+func (s *StructLiteral) GetAllFields() []*ast.Parameter {
+	if s.Parent == nil {
+		return s.Fields
+	}
+	// Avoid infinite recursion just in case
+	return append(s.Parent.GetAllFields(), s.Fields...)
+}
 
 type StructInstance struct {
 	Definition *StructLiteral

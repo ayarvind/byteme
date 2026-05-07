@@ -20,11 +20,12 @@ type FunctionSignature struct {
 type Analyzer struct {
 	env               *environment.Environment
 	errors            []string
+	structFields      map[string]map[string]string
 	structMethods     map[string]map[string]FunctionSignature
+	structParents     map[string]string
 	interfaces        map[string][]*ast.MethodSignature
 	currentReturnType string
 	funcSignatures    map[string]FunctionSignature
-	structFields      map[string]map[string]string
 	source            string
 	filename          string
 	lines             []string
@@ -164,11 +165,12 @@ func New(env *environment.Environment, source string, filename string) *Analyzer
 	a := &Analyzer{
 		env:               env,
 		errors:            []string{},
+		structFields:      make(map[string]map[string]string),
 		structMethods:     make(map[string]map[string]FunctionSignature),
+		structParents:     make(map[string]string),
 		interfaces:        make(map[string][]*ast.MethodSignature),
 		currentReturnType: "",
 		funcSignatures:    make(map[string]FunctionSignature),
-		structFields:      make(map[string]map[string]string),
 		source:            source,
 		filename:          filename,
 		lines:             strings.Split(source, "\n"),
@@ -222,6 +224,42 @@ func (a *Analyzer) isAssignable(target, source string) bool {
 	if target == "any" || source == "any" || target == source {
 		return true
 	}
+
+	// Union types (target)
+	if strings.Contains(target, "|") {
+		targets := strings.Split(target, "|")
+		for _, t := range targets {
+			if a.isAssignable(strings.TrimSpace(t), source) {
+				return true
+			}
+		}
+		return false
+	}
+
+	// Union types (source)
+	if strings.Contains(source, "|") {
+		sources := strings.Split(source, "|")
+		for _, s := range sources {
+			if !a.isAssignable(target, strings.TrimSpace(s)) {
+				return false
+			}
+		}
+		return true
+	}
+
+	// Inheritance
+	curr := source
+	for curr != "" {
+		parent, ok := a.structParents[curr]
+		if !ok {
+			break
+		}
+		if parent == target {
+			return true
+		}
+		curr = parent
+	}
+
 	// Implicit conversions
 	if target == "float" && source == "int" {
 		return true
@@ -266,6 +304,75 @@ func (a *Analyzer) isTerminated(stmt ast.Statement) bool {
 		}
 	}
 	return false
+}
+
+func (a *Analyzer) lookupField(typeName, fieldName string) (string, bool) {
+	// Handle unions: field must exist in ALL types
+	if strings.Contains(typeName, "|") {
+		types := strings.Split(typeName, "|")
+		var commonType string
+		for i, t := range types {
+			t = strings.TrimSpace(t)
+			fType, ok := a.lookupField(t, fieldName)
+			if !ok {
+				return "", false
+			}
+			if i == 0 {
+				commonType = fType
+			} else if commonType != fType {
+				commonType = "any" // Mixed types in union field
+			}
+		}
+		return commonType, true
+	}
+
+	fields, ok := a.structFields[typeName]
+	if ok {
+		if fType, ok := fields[fieldName]; ok {
+			return fType, true
+		}
+	}
+
+	parent, ok := a.structParents[typeName]
+	if ok {
+		return a.lookupField(parent, fieldName)
+	}
+
+	return "", false
+}
+
+func (a *Analyzer) lookupMethod(typeName, methodName string) (FunctionSignature, bool) {
+	// Handle unions: method must exist in ALL types
+	if strings.Contains(typeName, "|") {
+		types := strings.Split(typeName, "|")
+		var commonSig FunctionSignature
+		for i, t := range types {
+			t = strings.TrimSpace(t)
+			sig, ok := a.lookupMethod(t, methodName)
+			if !ok {
+				return FunctionSignature{}, false
+			}
+			if i == 0 {
+				commonSig = sig
+			}
+			// We could check sig compatibility here, but let's keep it simple
+		}
+		return commonSig, true
+	}
+
+	methods, ok := a.structMethods[typeName]
+	if ok {
+		if sig, ok := methods[methodName]; ok {
+			return sig, true
+		}
+	}
+
+	parent, ok := a.structParents[typeName]
+	if ok {
+		return a.lookupMethod(parent, methodName)
+	}
+
+	return FunctionSignature{}, false
 }
 
 func (a *Analyzer) Analyze(node ast.Node) string {
@@ -391,30 +498,23 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 		if n.Operator == "." {
 			leftType := a.Analyze(n.Left)
 			
-			// Check if it's a struct field or method access
-			if methods, ok := a.structMethods[leftType]; ok {
-				if rightIdent, ok := n.Right.(*ast.Identifier); ok {
-					if _, ok := methods[rightIdent.Value]; ok {
-						return "function" // Or a specialized type like "method"
-					}
+			rightIdent, isIdent := n.Right.(*ast.Identifier)
+			if isIdent {
+				// Check fields
+				if fieldType, ok := a.lookupField(leftType, rightIdent.Value); ok {
+					return fieldType
 				}
-			}
-
-			if fields, ok := a.structFields[leftType]; ok {
-				if rightIdent, ok := n.Right.(*ast.Identifier); ok {
-					if fieldType, ok := fields[rightIdent.Value]; ok {
-						return fieldType
-					}
-					a.error(n.Token, "struct %s has no field %s", leftType, rightIdent.Value)
-					return "any"
+				// Check methods
+				if _, ok := a.lookupMethod(leftType, rightIdent.Value); ok {
+					return "function"
 				}
-			}
 
-			// Dot is valid on struct instances, namespaces, and unknowns
-			// Any type that isn't one of the primitives is likely a struct instance
-			primitives := map[string]bool{"int": true, "float": true, "string": true, "bool": true, "thread": true, "interface": true}
-			if primitives[leftType] {
-				a.error(n.Token, "cannot use dot operator on type '%s' — only struct instances support field access", leftType)
+				if leftType != "any" && !strings.Contains(leftType, "|") {
+					a.error(n.Token, "type %s has no field or method %s", leftType, rightIdent.Value)
+				} else if strings.Contains(leftType, "|") {
+					a.error(n.Token, "field or method %s is not common to all types in union %s", rightIdent.Value, leftType)
+				}
+				return "any"
 			}
 			return "any"
 		}
@@ -500,10 +600,19 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 			a.preScan(stmt)
 		}
 
+		var terminated bool
 		for _, stmt := range n.Statements {
+			if terminated {
+				a.error(stmt.GetToken(), "unreachable code detected")
+				break
+			}
 			a.Analyze(stmt)
+			if a.isTerminated(stmt) {
+				terminated = true
+			}
 		}
 		a.env = oldEnv
+		return "any"
 
 	case *ast.FunctionLiteral:
 		if n.Name != nil {
@@ -587,6 +696,9 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 
 	case *ast.StructLiteral:
 		a.env.Set(n.Name.Value, "type", environment.PUBLIC, true)
+		if n.Parent != nil {
+			a.structParents[n.Name.Value] = n.Parent.Value
+		}
 		fields := make(map[string]string)
 		for _, f := range n.Fields {
 			fields[f.Name.Value] = f.Type

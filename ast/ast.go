@@ -421,6 +421,7 @@ func (nl *NamespaceLiteral) String() string {
 type StructLiteral struct {
 	Token          token.Token
 	Name           *Identifier
+	Parent         *Identifier // Inherited struct
 	Fields         []*Parameter
 	TypeParameters []*Identifier
 }

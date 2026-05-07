@@ -401,10 +401,8 @@ func (p *Parser) parseLetStatement() *ast.LetStatement {
 
 	if p.peekTokenIs(token.COLON) {
 		p.nextToken() // cur is :
-		if !p.expectPeek(token.IDENT) {
-			return nil
-		}
-		stmt.Type = p.curToken.Literal
+		p.nextToken() // cur is type
+		stmt.Type = p.parseTypeString()
 	}
 
 	if p.peekTokenIs(token.ASSIGN) {
@@ -430,11 +428,9 @@ func (p *Parser) parseConstStatement() *ast.ConstStatement {
 	stmt.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
 
 	if p.peekTokenIs(token.COLON) {
-		p.nextToken()
-		if !p.expectPeek(token.IDENT) {
-			return nil
-		}
-		stmt.Type = p.curToken.Literal
+		p.nextToken() // cur is :
+		p.nextToken() // cur is type
+		stmt.Type = p.parseTypeString()
 	}
 
 	if !p.expectPeek(token.ASSIGN) {
@@ -510,6 +506,14 @@ func (p *Parser) parseStructStatement() ast.Statement {
 		stmt.TypeParameters = p.parseTypeParameters()
 	}
 
+	if p.peekTokenIs(token.EXTENDS) {
+		p.nextToken()
+		if !p.expectPeek(token.IDENT) {
+			return nil
+		}
+		stmt.Parent = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	}
+
 	if !p.expectPeek(token.LBRACE) {
 		return nil
 	}
@@ -524,8 +528,8 @@ func (p *Parser) parseStructStatement() ast.Statement {
 			return nil
 		}
 		
-		p.nextToken()
-		fieldType := p.curToken.Literal
+		p.nextToken() // cur is type
+		fieldType := p.parseTypeString()
 		
 		stmt.Fields = append(stmt.Fields, &ast.Parameter{Name: fieldName, Type: fieldType})
 		
@@ -767,20 +771,11 @@ func (p *Parser) parseFunctionLiteral() ast.Expression {
 		lit.Parameters = params
 	}
 
-	// 4. Optional Return Type
+	// 4. Return type
 	if p.peekTokenIs(token.ARROW) {
-		p.nextToken() // cur is ->
-		if !p.expectPeek(token.IDENT) { return nil }
-		retType := p.curToken.Literal
-		if p.peekTokenIs(token.LT) {
-			p.nextToken()
-			retType += "<"
-			for !p.curTokenIs(token.GT) && !p.curTokenIs(token.EOF) {
-				p.nextToken()
-				retType += p.curToken.Literal
-			}
-		}
-		lit.ReturnType = retType
+		p.nextToken() // ->
+		p.nextToken() // cur is type
+		lit.ReturnType = p.parseTypeString()
 	}
 
 	// 5. Body
@@ -809,7 +804,7 @@ func (p *Parser) parseFunctionParameters() []*ast.Parameter {
 	if p.peekTokenIs(token.COLON) {
 		p.nextToken() // cur is :
 		p.nextToken() // cur is type
-		paramType = p.curToken.Literal
+		paramType = p.parseTypeString()
 	}
 	
 	identifiers = append(identifiers, &ast.Parameter{Name: ident, Type: paramType})
@@ -820,9 +815,9 @@ func (p *Parser) parseFunctionParameters() []*ast.Parameter {
 		ident := &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
 		paramType := "any"
 		if p.peekTokenIs(token.COLON) {
-			p.nextToken()
-			p.nextToken()
-			paramType = p.curToken.Literal
+			p.nextToken() // cur is :
+			p.nextToken() // cur is type
+			paramType = p.parseTypeString()
 		}
 		identifiers = append(identifiers, &ast.Parameter{Name: ident, Type: paramType})
 	}
@@ -993,6 +988,27 @@ func (p *Parser) registerPrefix(tokenType token.TokenType, fn prefixParseFn) {
 
 func (p *Parser) registerInfix(tokenType token.TokenType, fn infixParseFn) {
 	p.infixParseFns[tokenType] = fn
+}
+
+func (p *Parser) parseTypeString() string {
+	typeName := p.curToken.Literal
+	
+	// Handle generics like array<int>
+	if p.peekTokenIs(token.LT) {
+		p.nextToken() // <
+		p.nextToken() // cur is type inside <
+		typeName += "<" + p.parseTypeString() + ">"
+		if p.peekTokenIs(token.GT) {
+			p.nextToken()
+		}
+	}
+
+	for p.peekTokenIs(token.BIT_OR) {
+		p.nextToken() // |
+		p.nextToken() // cur is next type
+		typeName += "|" + p.parseTypeString()
+	}
+	return typeName
 }
 
 func (p *Parser) noPrefixParseFnError(t token.TokenType) {
