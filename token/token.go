@@ -48,6 +48,7 @@ const (
 	RBRACKET  TokenType = "]"
 	ARROW     TokenType = "->"
 	DOT       TokenType = "."
+	DOUBLE_COLON TokenType = "::"
 	AT        TokenType = "@"
 	MOD       TokenType = "%"
 
@@ -78,7 +79,12 @@ const (
 	ENUM      TokenType = "ENUM"
 	IMPORT    TokenType = "IMPORT"
 	FROM      TokenType = "FROM"
-	NULL      TokenType = "NULL"
+	NULL       TokenType = "NULL"
+	FOR        TokenType = "FOR"
+	IN         TokenType = "IN"
+	BREAK      TokenType = "BREAK"
+	CONTINUE   TokenType = "CONTINUE"
+	YIELD      TokenType = "YIELD"
 )
 
 type Token struct {
@@ -116,6 +122,11 @@ var keywords = map[string]TokenType{
 	"import":    IMPORT,
 	"from":      FROM,
 	"null":      NULL,
+	"for":       FOR,
+	"in":         IN,
+	"break":     BREAK,
+	"continue":  CONTINUE,
+	"yield":     YIELD,
 	"@":         AT,
 }
 

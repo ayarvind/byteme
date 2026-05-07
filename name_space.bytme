@@ -1,0 +1,11 @@
+public namespace Payment{
+    let a: int = 10;
+    let b: string = "hello";
+    let c: float = 3.14;
+}
+
+
+// access namespace members
+
+
+println(Payment.a, Payment.b, Payment.c);

@@ -1,0 +1,178 @@
+namespace SocialSystem {
+    
+    // Base class for all entities in the system
+    struct BaseEntity {
+        id: int | string,
+        createdAt: int
+    }
+
+    // User entity representing a platform member
+    struct User extends BaseEntity {
+        username: string,
+        email: string,
+        followers: array,
+        posts: array
+    }
+
+    // Post entity representing a shared update
+    struct Post extends BaseEntity {
+        authorId: int | string,
+        content: string,
+        likes: int
+    }
+
+    // Methods for User
+    fn (u: User) follow(other: User) {
+        if (u.id == other.id) {
+            throw "Self-referential follow detected: User cannot follow themselves.";
+        }
+        
+        // Use the built-in arrayPush
+        arrayPush(u.followers, other.id);
+        println("[Social] User", u.username, "is now following", other.username);
+    }
+
+    fn (u: User) createPost(content: string) -> Post {
+        let timestamp = timeNow();
+        // Post(id, createdAt, authorId, content, likes)
+        let p: Post = Post(timestamp, timestamp, u.id, content, 0);
+        arrayPush(u.posts, p);
+        println("[Social]", u.username, "published a new post:", content);
+        return p;
+    }
+
+    // Methods for Post
+    fn (p: Post) like() {
+        p.likes = p.likes + 1;
+        println("[Feed] Post", p.id, "received a like! Total:", p.likes);
+    }
+
+    fn (p: Post) display() {
+        println("----------------------------------------");
+        println("POST ID:", p.id);
+        println("AUTHOR ID:", p.authorId);
+        println("CONTENT:", p.content);
+        println("LIKES:", p.likes);
+        println("----------------------------------------");
+    }
+}
+
+// Analytics module to process social data
+namespace Analytics {
+    fn calculateEngagement(posts: array) -> float {
+        if (len(posts) == 0) {
+            return 0.0;
+        }
+        
+        let totalLikes = 0;
+        let i = 0;
+        while (i < len(posts)) {
+            let p = posts[i];
+            totalLikes = totalLikes + p.likes;
+            i = i + 1;
+        }
+        
+        return toFloat(totalLikes) / toFloat(len(posts));
+    }
+
+    fn findTopPost(posts: array) -> Post | string {
+        if (len(posts) == 0) {
+            return "No posts available.";
+        }
+        
+        let top = posts[0];
+        let i = 1;
+        while (i < len(posts)) {
+            if (posts[i].likes > top.likes) {
+                top = posts[i];
+            }
+            i = i + 1;
+        }
+        return top;
+    }
+}
+
+fn runSimulation() {
+    println(">>> INITIALIZING SOCIAL SYSTEM SIMULATION <<<");
+    
+    try {
+        // Create users with mixed ID types (int and string)
+        let alice: SocialSystem::User = SocialSystem::User(1001, timeNow(), "alice_dev", "alice@byteme.org", [], []);
+        let bob: SocialSystem::User = SocialSystem::User("UUID-BOB-99", timeNow(), "bob_architect", "bob@byteme.org", [], []);
+        let charlie: SocialSystem::User = SocialSystem::User(1003, timeNow(), "charlie_tester", "charlie@byteme.org", [], []);
+
+        println("Simulation Users Created:", alice.username, ",", bob.username, ",", charlie.username);
+
+        // Interaction sequence
+        alice.follow(bob);
+        bob.follow(charlie);
+        charlie.follow(alice);
+
+        // Content generation
+        let p1 = alice.createPost("ByteMe inheritance is extremely powerful!");
+        let p2 = bob.createPost("I agree! The union types are also very flexible.");
+        let p3 = alice.createPost("Check out this complex program I'm writing.");
+
+        // Engagement
+        p1.like();
+        p1.like();
+        p1.like();
+        p2.like();
+        p2.like();
+        p3.like();
+
+        // Display results
+        println("\n>>> SOCIAL FEED <<<");
+        p1.display();
+        p2.display();
+        p3.display();
+
+        // Analytics
+        let allPosts = [p1, p2, p3];
+        let avgEngagement = Analytics::calculateEngagement(allPosts);
+        println("\n>>> ANALYTICS REPORT <<<");
+        println("Average Likes per Post:", avgEngagement);
+
+        let topResult = Analytics::findTopPost(allPosts);
+        if (typeof(topResult) == "Post") {
+            println("Top Post Content:", topResult.content);
+        } else {
+            println("Status:", topResult);
+        }
+
+        // Test Type Safety & Inheritance
+        let entity: SocialSystem::BaseEntity = alice; // Child assigned to Parent
+        println("Polymorphic Check - Entity ID:", entity.id);
+
+        // Test Error Recovery
+        println("\n>>> TESTING ERROR RECOVERY <<<");
+        alice.follow(alice); // Should throw
+
+    } catch (err) {
+        println("CRITICAL ERROR CAUGHT:", err);
+    } finally {
+        println("\n>>> SIMULATION SHUTDOWN <<<");
+    }
+}
+
+// Helper to simulate system load using loops
+fn simulateSystemLoad(cycles: int) {
+    println("Simulating system load for", cycles, "cycles...");
+    let count = 0;
+    while (count < cycles) {
+        let x = toFloat(count) * 1.5;
+        count = count + 1;
+    }
+    println("Load simulation complete.");
+}
+
+fn main() {
+    simulateSystemLoad(5);
+    runSimulation();
+    
+    println("\n[System] Final Type Checks:");
+    println("Type of SocialSystem::User:", typeof(SocialSystem::User));
+    println("Language verification complete.");
+}
+
+main();

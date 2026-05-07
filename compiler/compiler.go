@@ -33,6 +33,13 @@ type Compiler struct {
 	sourceMap       map[int]int
 	currentNode     ast.Node
 	Filename        string
+	loops           []*LoopInfo
+}
+
+type LoopInfo struct {
+	StartPos      int
+	BreakJumps    []int
+	ContinueJumps []int
 }
 
 func New() *Compiler {
@@ -47,6 +54,8 @@ func New() *Compiler {
 	for name, index := range builtins {
 		c.symbolTable.DefineBuiltin(index, name)
 	}
+
+	c.loops = []*LoopInfo{}
 
 	return c
 }
@@ -472,6 +481,121 @@ func (c *Compiler) Compile(node ast.Node) error {
 		afterWhilePos := len(c.instructions)
 		c.changeOperand(jumpNotTruthyPos, afterWhilePos)
 		c.emit(code.OpNull) // Ensure expression statement balanced
+
+	case *ast.ForStatement:
+		// for (init; cond; post) body
+		err := c.Compile(n.Init)
+		if err != nil { return err }
+
+		startPos := len(c.instructions)
+		loopInfo := &LoopInfo{StartPos: startPos}
+		c.loops = append(c.loops, loopInfo)
+		defer func() { c.loops = c.loops[:len(c.loops)-1] }()
+
+		err = c.Compile(n.Condition)
+		if err != nil { return err }
+
+		jumpNotTruthyPos := c.emit(code.OpJumpNotTruthy, 9999)
+
+		err = c.Compile(n.Body)
+		if err != nil { return err }
+
+		// Continue jumps to post-statement
+		postStartPos := len(c.instructions)
+		for _, pos := range loopInfo.ContinueJumps {
+			c.changeOperand(pos, postStartPos)
+		}
+
+		err = c.Compile(n.Post)
+		if err != nil { return err }
+
+		c.emit(code.OpJump, startPos)
+
+		afterForPos := len(c.instructions)
+		c.changeOperand(jumpNotTruthyPos, afterForPos)
+		
+		for _, pos := range loopInfo.BreakJumps {
+			c.changeOperand(pos, afterForPos)
+		}
+		c.emit(code.OpNull)
+
+	case *ast.ForEachStatement:
+		// for (val in iterable) body
+		// Translates to iterator pattern:
+		// iter = OpIterInit(iterable)
+		// loop:
+		//   val, hasNext = OpIterNext(iter)
+		//   if !hasNext goto end
+		//   body
+		//   goto loop
+		// end:
+
+		err := c.Compile(n.Iterable)
+		if err != nil { return err }
+		c.emit(code.OpIterInit)
+		
+		// The iterator is on stack. We should probably store it in a hidden local?
+		// For simplicity, let's assume OpIterNext expects iterator on stack and keeps it there?
+		// Or we can use a local.
+		iterSym := c.symbolTable.Define("__iter_" + fmt.Sprintf("%d", len(c.instructions)))
+		c.emit(code.OpSetLocal, iterSym.Index)
+		
+		startPos := len(c.instructions)
+		loopInfo := &LoopInfo{StartPos: startPos}
+		c.loops = append(c.loops, loopInfo)
+		defer func() { c.loops = c.loops[:len(c.loops)-1] }()
+
+		c.emit(code.OpGetLocal, iterSym.Index)
+		c.emit(code.OpIterNext)
+		
+		// OpIterNext pushes: [val, hasNext]
+		jumpNotTruthyPos := c.emit(code.OpJumpNotTruthy, 9999)
+
+		// We need to bind val to the loop variable
+		valSym := c.symbolTable.Define(n.Value.Value)
+		if n.Key != nil {
+			// If key/val loop, OpIterNext should push [key, val, hasNext]
+		}
+		c.emit(code.OpSetLocal, valSym.Index)
+
+		err = c.Compile(n.Body)
+		if err != nil { return err }
+
+		// Continue jumps to loop start (which re-fetches next)
+		for _, pos := range loopInfo.ContinueJumps {
+			c.changeOperand(pos, startPos)
+		}
+
+		c.emit(code.OpJump, startPos)
+
+		afterLoopPos := len(c.instructions)
+		c.changeOperand(jumpNotTruthyPos, afterLoopPos)
+		
+		for _, pos := range loopInfo.BreakJumps {
+			c.changeOperand(pos, afterLoopPos)
+		}
+		c.emit(code.OpNull)
+
+	case *ast.BreakStatement:
+		if len(c.loops) == 0 {
+			return fmt.Errorf("break statement outside of loop")
+		}
+		pos := c.emit(code.OpJump, 9999)
+		info := c.loops[len(c.loops)-1]
+		info.BreakJumps = append(info.BreakJumps, pos)
+
+	case *ast.ContinueStatement:
+		if len(c.loops) == 0 {
+			return fmt.Errorf("continue statement outside of loop")
+		}
+		pos := c.emit(code.OpJump, 9999)
+		info := c.loops[len(c.loops)-1]
+		info.ContinueJumps = append(info.ContinueJumps, pos)
+
+	case *ast.YieldStatement:
+		err := c.Compile(n.Value)
+		if err != nil { return err }
+		c.emit(code.OpYield)
 
 	case *ast.BlockStatement:
 		// Pre-scan pass
@@ -971,11 +1095,12 @@ var builtins = map[string]int{
 	"typeof":         97,
 	"toChar":         98,
 	"toString":       99,
-	"httpHandle":    100,
-	"httpServe":     101,
-	"httpGet":       102,
-	"httpPost":      103,
-	"httpResponse":  104,
+	"httpHandle":    101,
+	"httpServe":     102,
+	"httpGet":       103,
+	"httpPost":      104,
+	"httpResponse":  105,
+	"generator":     100,
 	"int":           45,
 	"float":         46,
 	"string":        99,

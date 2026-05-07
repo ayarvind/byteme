@@ -1,0 +1,9 @@
+fn main() {
+    println("Start");
+    for (let i = 0; i < 3; i = i + 1) {
+        println("Loop i:", i);
+    }
+    println("End");
+}
+
+main();

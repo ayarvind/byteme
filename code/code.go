@@ -59,6 +59,9 @@ const (
 	OpGetFree
 	OpClosure
 	OpSetFree
+	OpIterInit
+	OpIterNext
+	OpYield
 )
 
 type Definition struct {
@@ -115,6 +118,9 @@ var definitions = map[Opcode]*Definition{
 	OpGetFree:       {"OpGetFree", []int{1}},
 	OpClosure:       {"OpClosure", []int{2, 1}}, // 2rd operand is number of upvalues
 	OpSetFree:       {"OpSetFree", []int{1}},
+	OpIterInit:      {"OpIterInit", []int{}},
+	OpIterNext:      {"OpIterNext", []int{}},
+	OpYield:         {"OpYield", []int{}},
 }
 
 func Lookup(op byte) (*Definition, error) {

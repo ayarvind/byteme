@@ -34,6 +34,7 @@ const (
 	STRUCT_OBJ         = "STRUCT_INSTANCE"
 	MAP_OBJ            = "map"
 	ERROR_OBJ          = "ERROR"
+	ITERATOR_OBJ       = "ITERATOR"
 )
 
 type Object interface {
@@ -147,6 +148,10 @@ func (c *Channel) Inspect() string  { return fmt.Sprintf("channel(%p)", c.Value)
 
 type BuiltinFn func(args ...Object) Object
 
+func GetVMContext() (*[]Object, *[]Object) {
+	return vmConstantsPtr, vmGlobalsPtr
+}
+
 type Builtin struct {
 	Fn BuiltinFn
 }
@@ -244,4 +249,50 @@ type FileHandle struct {
 }
 func (f *FileHandle) Type() ObjectType { return "FILE_HANDLE" }
 func (f *FileHandle) Inspect() string  { return fmt.Sprintf("FileHandle[%p]", f.File) }
+
+type ArrayIterator struct {
+	Array *Array
+	Index int
+}
+func (ai *ArrayIterator) Type() ObjectType { return ITERATOR_OBJ }
+func (ai *ArrayIterator) Inspect() string  { return "ArrayIterator" }
+func (ai *ArrayIterator) Next() (Object, bool) {
+	if ai.Index >= len(ai.Array.Elements) {
+		return nil, false
+	}
+	val := ai.Array.Elements[ai.Index]
+	ai.Index++
+	return val, true
+}
+
+type MapIterator struct {
+	Keys   []string
+	Values []Object
+	Index  int
+}
+func (mi *MapIterator) Type() ObjectType { return ITERATOR_OBJ }
+func (mi *MapIterator) Inspect() string  { return "MapIterator" }
+func (mi *MapIterator) Next() (Object, bool) {
+	if mi.Index >= len(mi.Keys) {
+		return nil, false
+	}
+	val := mi.Values[mi.Index]
+	mi.Index++
+	return val, true
+}
+
+type Generator struct {
+	VMState interface{} // Will hold the VM pointer to avoid circular dependency in object package
+}
+var GeneratorNext func(g *Generator) (Object, bool)
+var MakeGenerator func(fn *Closure, args []Object) Object
+
+func (g *Generator) Type() ObjectType { return ITERATOR_OBJ }
+func (g *Generator) Inspect() string  { return "Generator" }
+func (g *Generator) Next() (Object, bool) {
+	if GeneratorNext != nil {
+		return GeneratorNext(g)
+	}
+	return nil, false
+}
 

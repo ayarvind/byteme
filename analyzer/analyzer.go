@@ -161,6 +161,7 @@ func New(env *environment.Environment, source string, filename string) *Analyzer
 	env.Set("fWrite",        "function", environment.PUBLIC, true)
 	env.Set("fSeek",         "function", environment.PUBLIC, true)
 	env.Set("instanceOf",    "function", environment.PUBLIC, true)
+	env.Set("generator",     "function", environment.PUBLIC, true)
 
 	a := &Analyzer{
 		env:               env,
@@ -184,6 +185,7 @@ func New(env *environment.Environment, source string, filename string) *Analyzer
 	a.funcSignatures["mapHas"] = FunctionSignature{Params: []string{"map", "any"}, Return: "bool"}
 	a.funcSignatures["arrayLen"] = FunctionSignature{Params: []string{"array"}, Return: "int"}
 	a.funcSignatures["arrayPush"] = FunctionSignature{Params: []string{"array", "any"}, Return: "void"}
+	a.funcSignatures["generator"] = FunctionSignature{Params: []string{}, Return: "Iterator"}
 	
 	return a
 }
@@ -715,7 +717,7 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 		if ident, ok := n.Function.(*ast.Identifier); ok {
 			// Check signature
 			if sig, ok := a.funcSignatures[ident.Value]; ok {
-				if len(n.Arguments) != len(sig.Params) && ident.Value != "println" {
+				if len(n.Arguments) != len(sig.Params) && ident.Value != "println" && ident.Value != "generator" {
 					a.error(n.Token, "wrong number of arguments for %s: expected %d, got %d", ident.Value, len(sig.Params), len(n.Arguments))
 				} else {
 					// Check argument types
@@ -736,6 +738,8 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 				return "map"
 			case "array":
 				return "array"
+			case "generator":
+				return "Iterator"
 			case "len", "arrayLen", "toInt", "strIndex", "strLastIndex", "strCount":
 				return "int"
 			case "toFloat":
@@ -826,6 +830,53 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 	case *ast.EnumStatement:
 		a.env.Set(n.Name.Value, "namespace", environment.PUBLIC, true)
 		return "namespace"
+
+	case *ast.ForStatement:
+		// Save current environment
+		oldEnv := a.env
+		a.env = environment.NewEnclosedEnvironment(oldEnv)
+		
+		a.Analyze(n.Init)
+		condType := a.Analyze(n.Condition)
+		if condType != "bool" && condType != "any" {
+			a.error(n.Token, "for condition must be bool, got %s", condType)
+		}
+		a.Analyze(n.Post)
+		a.Analyze(n.Body)
+		
+		a.env = oldEnv
+		return "any"
+
+	case *ast.ForEachStatement:
+		iterableType := a.Analyze(n.Iterable)
+		if iterableType != "array" && iterableType != "map" && iterableType != "string" && iterableType != "Iterator" && iterableType != "any" {
+			a.error(n.Token, "cannot iterate over type %s", iterableType)
+		}
+
+		// Save current environment
+		oldEnv := a.env
+		a.env = environment.NewEnclosedEnvironment(oldEnv)
+		
+		if n.Key != nil {
+			keyType := "any"
+			if iterableType == "array" || iterableType == "string" { keyType = "int" }
+			if iterableType == "map" { keyType = "string" }
+			a.env.Set(n.Key.Value, keyType, environment.PUBLIC, false)
+		}
+		a.env.Set(n.Value.Value, "any", environment.PUBLIC, false)
+		
+		a.Analyze(n.Body)
+		
+		a.env = oldEnv
+		return "any"
+
+	case *ast.BreakStatement, *ast.ContinueStatement:
+		// We should check if we are inside a loop, but for now let's keep it simple
+		return "any"
+
+	case *ast.YieldStatement:
+		a.Analyze(n.Value)
+		return "any"
 	}
 
 	return "any"

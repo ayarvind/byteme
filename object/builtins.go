@@ -1100,6 +1100,24 @@ var Builtins = []*Builtin{
 			return &String{Value: args[0].Inspect()}
 		},
 	},
+	{ // 105: generator
+		Fn: func(args ...Object) Object {
+			if len(args) < 1 { return NULL }
+			fn, ok := args[0].(*Closure)
+			if !ok {
+				// Try CompiledFunction
+				if cf, ok := args[0].(*CompiledFunction); ok {
+					fn = &Closure{Fn: cf}
+				} else {
+					return &Error{Message: "first argument to generator must be a function, got " + string(args[0].Type())}
+				}
+			}
+			if MakeGenerator != nil {
+				return MakeGenerator(fn, args[1:])
+			}
+			return NULL
+		},
+	},
 }
 
 func ConvertToByteMeObject(val interface{}) Object {

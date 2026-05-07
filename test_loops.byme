@@ -1,0 +1,42 @@
+fn testClassicFor() {
+    println("--- Testing Classic For Loop ---");
+    for (let i = 0; i < 5; i = i + 1) {
+        if (i == 2) {
+            println("Skipping 2 with continue");
+            continue;
+        }
+        if (i == 4) {
+            println("Breaking at 4");
+            break;
+        }
+        println("i =", i);
+    }
+}
+
+fn testRangeFor() {
+    println("\n--- Testing Range For Loop (Array) ---");
+    let arr = ["apple", "banana", "cherry"];
+    for (fruit in arr) {
+        println("Fruit:", fruit);
+    }
+
+    println("\n--- Testing Range For Loop (String) ---");
+    let s = "Byte";
+    for (char in s) {
+        println("Char:", char);
+    }
+}
+
+fn main() {
+    testClassicFor();
+    testRangeFor();
+    
+    println("\n--- Nested Loops ---");
+    for (let i = 0; i < 3; i = i + 1) {
+        for (let j = 0; j < 2; j = j + 1) {
+            println("i:", i, "j:", j);
+        }
+    }
+}
+
+main();

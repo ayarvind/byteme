@@ -127,6 +127,34 @@ func (ws *WhileStatement) String() string {
 	return "while (" + ws.Condition.String() + ") " + ws.Body.String()
 }
 
+type ForStatement struct {
+	Token       token.Token // The 'for' token
+	Init        Statement   // let i = 0
+	Condition   Expression  // i < 10
+	Post        Statement   // i = i + 1
+	Body        *BlockStatement
+}
+func (fs *ForStatement) statementNode()       {}
+func (fs *ForStatement) TokenLiteral() string { return fs.Token.Literal }
+func (fs *ForStatement) GetToken() token.Token { return fs.Token }
+func (fs *ForStatement) String() string {
+	return "for (" + fs.Init.String() + " " + fs.Condition.String() + "; " + fs.Post.String() + ") " + fs.Body.String()
+}
+
+type ForEachStatement struct {
+	Token    token.Token // The 'for' token
+	Key      *Identifier // Optional: key in map or index in array
+	Value    *Identifier // Item in array or value in map
+	Iterable Expression  // The object being iterated over
+	Body     *BlockStatement
+}
+func (fes *ForEachStatement) statementNode()       {}
+func (fes *ForEachStatement) TokenLiteral() string { return fes.Token.Literal }
+func (fes *ForEachStatement) GetToken() token.Token { return fes.Token }
+func (fes *ForEachStatement) String() string {
+	return "for (" + fes.Value.String() + " in " + fes.Iterable.String() + ") " + fes.Body.String()
+}
+
 type ReturnStatement struct {
 	Token       token.Token
 	ReturnValue Expression
@@ -152,6 +180,32 @@ func (ts *ThrowStatement) GetToken() token.Token { return ts.Token }
 func (ts *ThrowStatement) String() string {
 	return "throw " + ts.Value.String() + ";"
 }
+
+type BreakStatement struct {
+	Token token.Token // the 'break' token
+}
+func (bs *BreakStatement) statementNode()       {}
+func (bs *BreakStatement) TokenLiteral() string { return bs.Token.Literal }
+func (bs *BreakStatement) GetToken() token.Token { return bs.Token }
+func (bs *BreakStatement) String() string       { return "break;" }
+
+type ContinueStatement struct {
+	Token token.Token // the 'continue' token
+}
+func (cs *ContinueStatement) statementNode()       {}
+func (cs *ContinueStatement) TokenLiteral() string { return cs.Token.Literal }
+func (cs *ContinueStatement) GetToken() token.Token { return cs.Token }
+func (cs *ContinueStatement) String() string       { return "continue;" }
+
+type YieldStatement struct {
+	Token token.Token // the 'yield' token
+	Value Expression
+}
+func (ys *YieldStatement) statementNode()       {}
+func (ys *YieldStatement) expressionNode()      {}
+func (ys *YieldStatement) TokenLiteral() string { return ys.Token.Literal }
+func (ys *YieldStatement) GetToken() token.Token { return ys.Token }
+func (ys *YieldStatement) String() string       { return "yield " + ys.Value.String() + ";" }
 
 type TryStatement struct {
 	Token      token.Token // the 'try' token

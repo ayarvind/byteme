@@ -120,7 +120,13 @@ func (l *Lexer) NextToken() token.Token {
 	case ';':
 		tok = l.newToken(token.SEMICOLON, l.ch)
 	case ':':
-		tok = l.newToken(token.COLON, l.ch)
+		if l.peekChar() == ':' {
+			ch := l.ch
+			l.readChar()
+			tok = token.Token{Type: token.DOUBLE_COLON, Literal: string(ch) + string(l.ch), Line: startLine, Column: startColumn}
+		} else {
+			tok = l.newToken(token.COLON, l.ch)
+		}
 	case ',':
 		tok = l.newToken(token.COMMA, l.ch)
 	case '{':

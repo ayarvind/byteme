@@ -1,0 +1,7 @@
+fn main() {
+    let s = "ABC";
+    for (c in s) {
+        println("Char:", c);
+    }
+}
+main();

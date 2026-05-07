@@ -13,6 +13,7 @@ import (
 const StackSize = 8192
 const MaxFrames = 2048
 const GlobalsSize = 65536
+var ErrYield = fmt.Errorf("yield")
 
 type VM struct {
 	constants []object.Object
@@ -26,6 +27,7 @@ type VM struct {
 
 	catchHandlers []*CatchHandler
 	structs       map[string]*object.StructLiteral
+	YieldedValue  object.Object
 }
 
 type CatchHandler struct {
@@ -39,6 +41,27 @@ var httpBuiltinStart int
 
 func init() {
 	httpBuiltinStart = object.RegisterHTTPBuiltins()
+	object.GeneratorNext = func(g *object.Generator) (object.Object, bool) {
+		if v, ok := g.VMState.(*VM); ok {
+			return v.Next()
+		}
+		return object.NULL, false
+	}
+	object.MakeGenerator = func(fn *object.Closure, args []object.Object) object.Object {
+		consts, globs := object.GetVMContext()
+		child := NewWithGlobalStore(*consts, *globs)
+		
+		child.push(fn)
+		for _, arg := range args {
+			child.push(arg)
+		}
+
+		frame := NewFrame(fn, child.sp-len(args))
+		child.pushFrame(frame)
+		child.sp = frame.basePointer + fn.Fn.NumLocals
+		
+		return &object.Generator{VMState: child}
+	}
 }
 
 func New(bytecode *compiler.Bytecode) *VM {
@@ -495,9 +518,73 @@ func (vm *VM) Run() error {
 			left := vm.pop()
 			err := vm.executeSetIndexExpression(left, index, value)
 			if err != nil { return err }
+
+		case code.OpIterInit:
+			obj := vm.pop()
+			switch o := obj.(type) {
+			case *object.Array:
+				vm.push(&object.ArrayIterator{Array: o, Index: 0})
+			case *object.Map:
+				keys := make([]string, 0, len(o.Pairs))
+				vals := make([]object.Object, 0, len(o.Pairs))
+				for k, p := range o.Pairs {
+					keys = append(keys, k)
+					vals = append(vals, p.Value)
+				}
+				vm.push(&object.MapIterator{Keys: keys, Values: vals, Index: 0})
+			case *object.String:
+				// Treat string as array of chars
+				elements := make([]object.Object, len(o.Value))
+				for i, r := range o.Value {
+					elements[i] = &object.String{Value: string(r)}
+				}
+				vm.push(&object.ArrayIterator{Array: &object.Array{Elements: elements}, Index: 0})
+			default:
+				if obj.Type() == object.ITERATOR_OBJ {
+					vm.push(obj)
+					break
+				}
+				return fmt.Errorf("cannot iterate over %s", obj.Type())
+			}
+
+		case code.OpIterNext:
+			iterObj := vm.pop()
+			var val object.Object
+			var hasNext bool
+
+			switch it := iterObj.(type) {
+			case *object.ArrayIterator:
+				val, hasNext = it.Next()
+			case *object.MapIterator:
+				val, hasNext = it.Next()
+			case *object.Generator:
+				val, hasNext = it.Next()
+			default:
+				return fmt.Errorf("not an iterator: %T", iterObj)
+			}
+
+			if hasNext {
+				vm.push(val)
+				vm.push(object.TRUE)
+			} else {
+				vm.push(object.NULL)
+				vm.push(object.FALSE)
+			}
+
+		case code.OpYield:
+			vm.YieldedValue = vm.pop()
+			return ErrYield
 		}
 	}
 	return nil
+}
+
+func (vm *VM) Next() (object.Object, bool) {
+	err := vm.Run()
+	if err == ErrYield {
+		return vm.YieldedValue, true
+	}
+	return object.NULL, false
 }
 
 func (vm *VM) Trace() string {

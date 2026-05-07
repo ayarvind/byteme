@@ -1,0 +1,30 @@
+fn count(n) {
+    let i = 0;
+    while (i < n) {
+        yield i;
+        i = i + 1;
+    }
+}
+
+fn main() {
+    println("--- Testing Yield / Generator ---");
+    let c = generator(count, 3);
+    
+    for (val in c) {
+        println("Yielded:", val);
+    }
+    
+    println("\n--- Testing Direct Yield in Loop ---");
+    // This is more like an 'iter' function
+    let gen2 = generator(fn() {
+        yield "A";
+        yield "B";
+        yield "C";
+    });
+    
+    for (v in gen2) {
+        println("Got:", v);
+    }
+}
+
+main();

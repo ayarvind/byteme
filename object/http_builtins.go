@@ -56,7 +56,6 @@ func RegisterHTTPBuiltins() int {
 	// Index start+4: httpResponse(status, body)
 	Builtins = append(Builtins, &Builtin{Fn: builtinHTTPResponse})
 
-	fmt.Printf("[DEBUG] RegisterHTTPBuiltins: start=%d, total=%d\n", start, len(Builtins))
 	return start
 }
 

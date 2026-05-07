@@ -44,6 +44,7 @@ var precedences = map[token.TokenType]int{
 	token.LPAREN:   CALL,
 	token.LBRACKET: INDEX,
 	token.DOT:      ACCESS,
+	token.DOUBLE_COLON: ACCESS,
 }
 
 func (p *Parser) registerParsers() {
@@ -66,6 +67,7 @@ func (p *Parser) registerParsers() {
 	p.registerPrefix(token.SPAWN, p.parseSpawnExpression)
 	p.registerPrefix(token.AWAIT, p.parseAwaitExpression)
 	p.registerPrefix(token.NULL, p.parseNull)
+	p.registerPrefix(token.YIELD, p.parseYieldExpression)
 
 	p.infixParseFns = make(map[token.TokenType]infixParseFn)
 	p.registerInfix(token.PLUS, p.parseInfixExpression)
@@ -88,6 +90,7 @@ func (p *Parser) registerParsers() {
 	p.registerInfix(token.LBRACKET, p.parseIndexExpression)
 	p.registerInfix(token.ASSIGN, p.parseInfixExpression) // Treat as infix
 	p.registerInfix(token.DOT, p.parseInfixExpression)
+	p.registerInfix(token.DOUBLE_COLON, p.parseInfixExpression)
 }
 
 func (p *Parser) parseArrayLiteral() ast.Expression {
@@ -180,10 +183,19 @@ func (p *Parser) parseStatement() ast.Statement {
 		return p.parseReturnStatement()
 	case token.WHILE:
 		return p.parseWhileStatement()
+	case token.FOR:
+		return p.parseForStatement()
+	case token.BREAK:
+		return p.parseBreakStatement()
+	case token.CONTINUE:
+		return p.parseContinueStatement()
 	case token.TRY:
 		return p.parseTryStatement()
 	case token.THROW:
 		return p.parseThrowStatement()
+	case token.YIELD:
+		// yield can also be a statement
+		return p.parseYieldStatement()
 	case token.PUBLIC:
 		p.nextToken() // consume 'public'
 		switch p.curToken.Type {
@@ -313,6 +325,90 @@ func (p *Parser) parseWhileStatement() *ast.WhileStatement {
 	if !p.expectPeek(token.LBRACE) { return nil }
 	stmt.Body = p.parseBlockStatement()
 	return stmt
+}
+
+func (p *Parser) parseForStatement() ast.Statement {
+	tokenFor := p.curToken
+	if !p.expectPeek(token.LPAREN) { return nil }
+	
+	// Check if it's a for-in loop or a classic for loop
+	// for (val in iterable) OR for (let i = 0; i < 10; i = i + 1)
+	
+	// We need to look ahead. Since our parser is simple, let's try to parse the first part.
+	p.nextToken() // move past (
+	
+	// If it's for (val in iterable), the first part is an identifier.
+	// If it's for (let i = 0; ...), the first part is 'let'.
+	
+	if p.curTokenIs(token.LET) {
+		// Classic for loop: for (let i = 0; i < 10; i = i + 1)
+		stmt := &ast.ForStatement{Token: tokenFor}
+		stmt.Init = p.parseLetStatement()
+		// parseLetStatement might have consumed the semicolon if it was there.
+		// Standard for loop uses ;
+		if p.curTokenIs(token.SEMICOLON) { p.nextToken() }
+		
+		stmt.Condition = p.parseExpression(LOWEST)
+		if !p.expectPeek(token.SEMICOLON) { return nil }
+		p.nextToken()
+		
+		stmt.Post = p.parseStatement()
+		
+		if !p.expectPeek(token.RPAREN) { return nil }
+		if !p.expectPeek(token.LBRACE) { return nil }
+		stmt.Body = p.parseBlockStatement()
+		return stmt
+	}
+	
+	// Range loop: for (item in iterable) or for (key, val in iterable)
+	stmt := &ast.ForEachStatement{Token: tokenFor}
+	if !p.curTokenIs(token.IDENT) { return nil }
+	
+	ident1 := &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	if p.peekTokenIs(token.COMMA) {
+		p.nextToken() // ,
+		p.nextToken() // val
+		stmt.Key = ident1
+		stmt.Value = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	} else {
+		stmt.Value = ident1
+	}
+	
+	if !p.expectPeek(token.IN) { return nil }
+	p.nextToken()
+	stmt.Iterable = p.parseExpression(LOWEST)
+	
+	if !p.expectPeek(token.RPAREN) { return nil }
+	if !p.expectPeek(token.LBRACE) { return nil }
+	stmt.Body = p.parseBlockStatement()
+	return stmt
+}
+
+func (p *Parser) parseBreakStatement() *ast.BreakStatement {
+	stmt := &ast.BreakStatement{Token: p.curToken}
+	if p.peekTokenIs(token.SEMICOLON) { p.nextToken() }
+	return stmt
+}
+
+func (p *Parser) parseContinueStatement() *ast.ContinueStatement {
+	stmt := &ast.ContinueStatement{Token: p.curToken}
+	if p.peekTokenIs(token.SEMICOLON) { p.nextToken() }
+	return stmt
+}
+
+func (p *Parser) parseYieldStatement() *ast.YieldStatement {
+	stmt := &ast.YieldStatement{Token: p.curToken}
+	p.nextToken()
+	stmt.Value = p.parseExpression(LOWEST)
+	if p.peekTokenIs(token.SEMICOLON) { p.nextToken() }
+	return stmt
+}
+
+func (p *Parser) parseYieldExpression() ast.Expression {
+	exp := &ast.YieldStatement{Token: p.curToken} // Reusing statement as expression for now or create new node
+	p.nextToken()
+	exp.Value = p.parseExpression(LOWEST)
+	return exp // This is technically a statement node but will be used in expression context
 }
 
 func (p *Parser) parseThrowStatement() *ast.ThrowStatement {
@@ -1003,10 +1099,17 @@ func (p *Parser) parseTypeString() string {
 		}
 	}
 
-	for p.peekTokenIs(token.BIT_OR) {
-		p.nextToken() // |
-		p.nextToken() // cur is next type
-		typeName += "|" + p.parseTypeString()
+	for p.peekTokenIs(token.BIT_OR) || p.peekTokenIs(token.DOUBLE_COLON) || p.peekTokenIs(token.DOT) {
+		if p.peekTokenIs(token.BIT_OR) {
+			p.nextToken() // |
+			p.nextToken() // cur is next type
+			typeName += "|" + p.parseTypeString()
+		} else {
+			sep := p.peekToken.Literal
+			p.nextToken() // :: or .
+			p.nextToken() // cur is next part
+			typeName += sep + p.parseTypeString()
+		}
 	}
 	return typeName
 }
