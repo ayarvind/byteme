@@ -10,12 +10,20 @@ import (
 	"github.com/byteme/compiler/parser"
 	"github.com/byteme/compiler/token"
 )
+ 
+type FunctionSignature struct {
+	Params []string
+	Return string
+}
 
 type Analyzer struct {
-	env           *environment.Environment
-	errors        []string
-	structMethods map[string]map[string]bool
-	interfaces    map[string][]*ast.MethodSignature
+	env               *environment.Environment
+	errors            []string
+	structMethods     map[string]map[string]bool
+	interfaces        map[string][]*ast.MethodSignature
+	currentReturnType string
+	funcSignatures    map[string]FunctionSignature
+	structFields      map[string]map[string]string
 }
 
 func New(env *environment.Environment) *Analyzer {
@@ -149,12 +157,26 @@ func New(env *environment.Environment) *Analyzer {
 	env.Set("fSeek",         "function", environment.PUBLIC, true)
 	env.Set("instanceOf",    "function", environment.PUBLIC, true)
 
-	return &Analyzer{
-		env:           env,
-		errors:        []string{},
-		structMethods: make(map[string]map[string]bool),
-		interfaces:    make(map[string][]*ast.MethodSignature),
+	a := &Analyzer{
+		env:               env,
+		errors:            []string{},
+		structMethods:     make(map[string]map[string]bool),
+		interfaces:        make(map[string][]*ast.MethodSignature),
+		currentReturnType: "",
+		funcSignatures:    make(map[string]FunctionSignature),
+		structFields:      make(map[string]map[string]string),
 	}
+	
+	// Register built-in signatures
+	a.funcSignatures["len"] = FunctionSignature{Params: []string{"any"}, Return: "int"}
+	a.funcSignatures["println"] = FunctionSignature{Params: []string{"any"}, Return: "void"}
+	a.funcSignatures["mapSet"] = FunctionSignature{Params: []string{"map", "any", "any"}, Return: "void"}
+	a.funcSignatures["mapGet"] = FunctionSignature{Params: []string{"map", "any"}, Return: "any"}
+	a.funcSignatures["mapHas"] = FunctionSignature{Params: []string{"map", "any"}, Return: "bool"}
+	a.funcSignatures["arrayLen"] = FunctionSignature{Params: []string{"array"}, Return: "int"}
+	a.funcSignatures["arrayPush"] = FunctionSignature{Params: []string{"array", "any"}, Return: "void"}
+	
+	return a
 }
 
 func (a *Analyzer) Errors() []string {
@@ -293,8 +315,20 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 
 	case *ast.InfixExpression:
 		if n.Operator == "." {
-			// Dot is valid on struct instances, namespaces, and unknowns
 			leftType := a.Analyze(n.Left)
+			
+			// Check if it's a struct field access
+			if fields, ok := a.structFields[leftType]; ok {
+				if rightIdent, ok := n.Right.(*ast.Identifier); ok {
+					if fieldType, ok := fields[rightIdent.Value]; ok {
+						return fieldType
+					}
+					a.error(n.Token, "struct %s has no field %s", leftType, rightIdent.Value)
+					return "any"
+				}
+			}
+
+			// Dot is valid on struct instances, namespaces, and unknowns
 			// Any type that isn't one of the primitives is likely a struct instance
 			primitives := map[string]bool{"int": true, "float": true, "string": true, "bool": true, "thread": true, "interface": true}
 			if primitives[leftType] {
@@ -323,7 +357,7 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 		}
 
 		switch n.Operator {
-		case "==", "!=", "<", ">":
+		case "==", "!=", "<", ">", "<=", ">=":
 			return "bool"
 		default:
 			return leftType
@@ -336,8 +370,22 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 		return a.Analyze(n.Expression)
 
 	case *ast.WhileStatement:
-		a.Analyze(n.Condition)
+		condType := a.Analyze(n.Condition)
+		if condType != "bool" && condType != "any" {
+			a.error(n.Token, "while condition must be bool, got %s", condType)
+		}
 		a.Analyze(n.Body)
+		return "any"
+
+	case *ast.IfExpression:
+		condType := a.Analyze(n.Condition)
+		if condType != "bool" && condType != "any" {
+			a.error(n.Token, "if condition must be bool, got %s", condType)
+		}
+		a.Analyze(n.Consequence)
+		if n.Alternative != nil {
+			a.Analyze(n.Alternative)
+		}
 		return "any"
 
 	case *ast.ArrayLiteral:
@@ -369,6 +417,12 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 	case *ast.FunctionLiteral:
 		if n.Name != nil {
 			a.env.Set(n.Name.Value, "function", environment.PUBLIC, true)
+			
+			sig := FunctionSignature{Return: n.ReturnType}
+			for _, p := range n.Parameters {
+				sig.Params = append(sig.Params, p.Type)
+			}
+			a.funcSignatures[n.Name.Value] = sig
 		}
 		// Check return type and parameters
 		funcEnv := environment.NewEnclosedEnvironment(a.env)
@@ -393,7 +447,13 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 		// Analyze body with the function environment
 		oldEnv := a.env
 		a.env = funcEnv
+		
+		oldRet := a.currentReturnType
+		a.currentReturnType = n.ReturnType
+		
 		a.Analyze(n.Body)
+		
+		a.currentReturnType = oldRet
 		a.env = oldEnv
 		return "function"
 
@@ -425,7 +485,11 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 
 	case *ast.StructLiteral:
 		a.env.Set(n.Name.Value, "type", environment.PUBLIC, true)
-		// We could analyze fields here if we want to check type parameter usage
+		fields := make(map[string]string)
+		for _, f := range n.Fields {
+			fields[f.Name.Value] = f.Type
+		}
+		a.structFields[n.Name.Value] = fields
 		return "type"
 
 	case *ast.CallExpression:
@@ -435,6 +499,14 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 		}
 		
 		if ident, ok := n.Function.(*ast.Identifier); ok {
+			// Check signature
+			if sig, ok := a.funcSignatures[ident.Value]; ok {
+				if len(n.Arguments) != len(sig.Params) && ident.Value != "println" {
+					a.error(n.Token, "wrong number of arguments for %s: expected %d, got %d", ident.Value, len(sig.Params), len(n.Arguments))
+				}
+				// Type checking for arguments could be added here
+			}
+
 			// Built-in return type deduction
 			switch ident.Value {
 			case "map": return "map"
@@ -459,6 +531,29 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 
 	case *ast.AwaitExpression:
 		return a.Analyze(n.Expression)
+
+	case *ast.ReturnStatement:
+		var retType string
+		if n.ReturnValue != nil {
+			retType = a.Analyze(n.ReturnValue)
+		} else {
+			retType = "any" // Default for empty return
+		}
+		
+		if a.currentReturnType != "" && a.currentReturnType != "any" && retType != "any" {
+			if retType != a.currentReturnType {
+				a.error(n.Token, "return type mismatch: expected %s, got %s", a.currentReturnType, retType)
+			}
+		}
+		return retType
+
+	case *ast.AssignmentStatement:
+		leftType := a.Analyze(n.Left)
+		rightType := a.Analyze(n.Value)
+		if leftType != "any" && rightType != "any" && leftType != rightType {
+			a.error(n.Token, "type mismatch in assignment: cannot assign %s to %s", rightType, leftType)
+		}
+		return rightType
 
 	case *ast.ThrowStatement:
 		a.Analyze(n.Value)
@@ -500,9 +595,19 @@ func (a *Analyzer) preScan(stmt ast.Statement) {
 		case *ast.FunctionLiteral:
 			if expr.Name != nil {
 				a.env.Set(expr.Name.Value, "function", environment.PUBLIC, true)
+				sig := FunctionSignature{Return: expr.ReturnType}
+				for _, p := range expr.Parameters {
+					sig.Params = append(sig.Params, p.Type)
+				}
+				a.funcSignatures[expr.Name.Value] = sig
 			}
 		case *ast.StructLiteral:
 			a.env.Set(expr.Name.Value, "type", environment.PUBLIC, true)
+			fields := make(map[string]string)
+			for _, f := range expr.Fields {
+				fields[f.Name.Value] = f.Type
+			}
+			a.structFields[expr.Name.Value] = fields
 		}
 	case *ast.InterfaceStatement:
 		a.env.Set(s.Name.Value, "interface", environment.PUBLIC, true)

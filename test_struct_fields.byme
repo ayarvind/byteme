@@ -1,0 +1,10 @@
+struct User {
+    name: string,
+    age: int
+}
+
+fn main() {
+    let u:User = User("Alice", 25);
+   println(typeof(u))
+}
+main();

@@ -1075,6 +1075,9 @@ var Builtins = []*Builtin{
 	{ // 97: typeof
 		Fn: func(args ...Object) Object {
 			if len(args) != 1 { return NULL }
+			if si, ok := args[0].(*StructInstance); ok {
+				return &String{Value: si.Definition.Name}
+			}
 			return &String{Value: string(args[0].Type())}
 		},
 	},

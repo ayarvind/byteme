@@ -264,6 +264,9 @@ var builtins = map[string]*object.Builtin{
 	"typeof": {
 		Fn: func(args ...object.Object) object.Object {
 			if len(args) != 1 { return NULL }
+			if si, ok := args[0].(*object.StructInstance); ok {
+				return &object.String{Value: si.Definition.Name}
+			}
 			return &object.String{Value: string(args[0].Type())}
 		},
 	},
