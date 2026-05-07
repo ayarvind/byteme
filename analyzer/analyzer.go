@@ -237,6 +237,15 @@ func (a *Analyzer) isAssignable(target, source string) bool {
 		}
 		return false
 	}
+	if strings.Contains(target, "|") {
+		targets := strings.Split(target, "|")
+		for _, t := range targets {
+			if a.isAssignable(strings.TrimSpace(t), source) {
+				return true
+			}
+		}
+		return false
+	}
 
 	// Union types (source)
 	if strings.Contains(source, "|") {
@@ -263,9 +272,19 @@ func (a *Analyzer) isAssignable(target, source string) bool {
 	}
 
 	// Implicit conversions
-	if target == "float" && source == "int" {
-		return true
+	if target == "float" && source == "int" { return true }
+	if target == "string" && (source == "int" || source == "float" || source == "bool" || source == "char") { return true }
+
+	if strings.Contains(source, ".") && !strings.Contains(target, ".") && target != "any" && target != "int" && target != "float" && target != "string" && target != "bool" && target != "char" && target != "array" && target != "map" {
+		if strings.HasSuffix(source, "."+target) {
+			return true
+		}
 	}
+	// Case where both are base names but match one of the full names? 
+	// (Too complex, let's stick to suffix match)
+
+	if target == source { return true }
+
 	// Interface implementation
 	methods, isInterface := a.interfaces[target]
 	if isInterface {
@@ -329,6 +348,18 @@ func (a *Analyzer) lookupField(typeName, fieldName string) (string, bool) {
 	}
 
 	fields, ok := a.structFields[typeName]
+	if !ok {
+		// Try to resolve base name to full name
+		for full, f := range a.structFields {
+			if strings.HasSuffix(full, "."+typeName) {
+				fields = f
+				ok = true
+				typeName = full
+				break
+			}
+		}
+	}
+
 	if ok {
 		if fType, ok := fields[fieldName]; ok {
 			return fType, true
@@ -363,6 +394,18 @@ func (a *Analyzer) lookupMethod(typeName, methodName string) (FunctionSignature,
 	}
 
 	methods, ok := a.structMethods[typeName]
+	if !ok {
+		// Try to resolve base name to full name
+		for full, m := range a.structMethods {
+			if strings.HasSuffix(full, "."+typeName) {
+				methods = m
+				ok = true
+				typeName = full
+				break
+			}
+		}
+	}
+
 	if ok {
 		if sig, ok := methods[methodName]; ok {
 			return sig, true
@@ -444,7 +487,17 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 				return "any"
 			}
 			typeName = a.Analyze(n.Value)
-		} else if n.Value != nil {
+		}
+		// Resolve base name if possible
+		if _, ok := a.structFields[typeName]; !ok && typeName != "any" && typeName != "int" && typeName != "float" && typeName != "string" && typeName != "bool" && typeName != "char" && typeName != "array" && typeName != "map" {
+			for full := range a.structFields {
+				if strings.HasSuffix(full, "."+typeName) {
+					typeName = full
+					break
+				}
+			}
+		}
+		if n.Value != nil {
 			valType := a.Analyze(n.Value)
 			if !a.isAssignable(typeName, valType) {
 				a.error(n.Token, "type mismatch: cannot assign %s to %s", valType, typeName)
@@ -473,6 +526,15 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 	case *ast.Identifier:
 		sym, ok := a.env.Get(n.Value)
 		if !ok {
+			// Try registered functions
+			for full := range a.funcSignatures {
+				if strings.HasSuffix(full, "."+n.Value) {
+					if s, ok := a.env.Get(full); ok {
+						return s.Type
+					}
+				}
+			}
+
 			a.error(n.Token, "undefined variable: %s", n.Value)
 			return "any"
 		}
@@ -514,7 +576,8 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 				if leftType != "any" && !strings.Contains(leftType, "|") {
 					a.error(n.Token, "type %s has no field or method %s", leftType, rightIdent.Value)
 				} else if strings.Contains(leftType, "|") {
-					a.error(n.Token, "field or method %s is not common to all types in union %s", rightIdent.Value, leftType)
+					// Return any but don't error for now to allow flexible union usage
+					return "any"
 				}
 				return "any"
 			}
@@ -575,7 +638,42 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 		if condType != "bool" && condType != "any" {
 			a.error(n.Token, "if condition must be bool, got %s", condType)
 		}
-		a.Analyze(n.Consequence)
+
+		// Simple type narrowing: if (typeof(x) == "Type")
+		var narrowedEnv *environment.Environment
+		if bin, ok := n.Condition.(*ast.InfixExpression); ok && bin.Operator == "==" {
+			if call, ok := bin.Left.(*ast.CallExpression); ok {
+				if ident, ok := call.Function.(*ast.Identifier); ok && ident.Value == "typeof" {
+					if targetIdent, ok := call.Arguments[0].(*ast.Identifier); ok {
+						if typeLit, ok := bin.Right.(*ast.StringLiteral); ok {
+							narrowedEnv = environment.NewEnclosedEnvironment(a.env)
+							typeName := typeLit.Value
+							// Try to resolve base name to full name if needed
+							if _, ok := a.structFields[typeName]; !ok {
+								// Check all registered structs for a matching base name
+								for full := range a.structFields {
+									if strings.HasSuffix(full, "."+typeName) || full == typeName {
+										typeName = full
+										break
+									}
+								}
+							}
+							narrowedEnv.Set(targetIdent.Value, typeName, environment.PUBLIC, false)
+						}
+					}
+				}
+			}
+		}
+
+		if narrowedEnv != nil {
+			oldEnv := a.env
+			a.env = narrowedEnv
+			a.Analyze(n.Consequence)
+			a.env = oldEnv
+		} else {
+			a.Analyze(n.Consequence)
+		}
+
 		if n.Alternative != nil {
 			a.Analyze(n.Alternative)
 		}
@@ -586,6 +684,33 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 			a.Analyze(el)
 		}
 		return "array"
+
+	case *ast.FunctionLiteral:
+		// Save current state
+		oldEnv := a.env
+		oldRet := a.currentReturnType
+		
+		a.env = environment.NewEnclosedEnvironment(oldEnv)
+		a.currentReturnType = strings.ReplaceAll(n.ReturnType, "::", ".")
+
+		// Register parameters
+		for _, p := range n.Parameters {
+			pType := strings.ReplaceAll(p.Type, "::", ".")
+			a.env.Set(p.Name.Value, pType, environment.PUBLIC, false)
+		}
+
+		// Handle receiver for methods
+		if n.Receiver != nil {
+			recType := strings.ReplaceAll(n.Receiver.Type, "::", ".")
+			a.env.Set(n.Receiver.Name.Value, recType, environment.PUBLIC, false)
+		}
+
+		a.Analyze(n.Body)
+
+		// Restore state
+		a.env = oldEnv
+		a.currentReturnType = oldRet
+		return "function"
 
 	case *ast.IndexExpression:
 		a.Analyze(n.Left)
@@ -616,85 +741,6 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 		a.env = oldEnv
 		return "any"
 
-	case *ast.FunctionLiteral:
-		if n.Name != nil {
-			a.env.Set(n.Name.Value, "function", environment.PUBLIC, true)
-			
-			sig := FunctionSignature{Return: n.ReturnType}
-			for _, p := range n.Parameters {
-				sig.Params = append(sig.Params, p.Type)
-			}
-			a.funcSignatures[n.Name.Value] = sig
-		}
-		// Check return type and parameters
-		funcEnv := environment.NewEnclosedEnvironment(a.env)
-		
-		for _, tp := range n.TypeParameters {
-			funcEnv.Set(tp.Value, "type", environment.PUBLIC, true)
-		}
-
-		if n.Receiver != nil {
-			funcEnv.Set(n.Receiver.Name.Value, n.Receiver.Type, environment.PUBLIC, false)
-			// Track that this type has this method
-			if a.structMethods[n.Receiver.Type] == nil {
-				a.structMethods[n.Receiver.Type] = make(map[string]FunctionSignature)
-			}
-			sig := FunctionSignature{Return: n.ReturnType}
-			for _, p := range n.Parameters {
-				sig.Params = append(sig.Params, p.Type)
-			}
-			a.structMethods[n.Receiver.Type][n.Name.Value] = sig
-		}
-
-		for _, p := range n.Parameters {
-			funcEnv.Set(p.Name.Value, p.Type, environment.PUBLIC, false)
-		}
-		
-		// Analyze body with the function environment
-		oldEnv := a.env
-		a.env = funcEnv
-		
-		oldRet := a.currentReturnType
-		a.currentReturnType = n.ReturnType
-		
-		a.Analyze(n.Body)
-
-		// Exhaustive return check
-		if n.ReturnType != "any" && n.ReturnType != "" && n.ReturnType != "void" {
-			if !a.isTerminated(n.Body) {
-				a.error(n.Token, "missing return at end of function: expected %s", n.ReturnType)
-			}
-		}
-		
-		a.currentReturnType = oldRet
-		a.env = oldEnv
-		return "function"
-
-	case *ast.NamespaceLiteral:
-		// Handle inheritance
-		if n.Parent != nil {
-			_, ok := a.env.Get(n.Parent.Value)
-			if !ok {
-				a.error(n.Parent.Token, "parent namespace %s not found", n.Parent.Value)
-			}
-		}
-
-		nsEnv := environment.NewEnclosedEnvironment(a.env)
-		
-		// Register the namespace itself as a symbol
-		a.env.Set(n.Name.Value, "namespace", environment.PUBLIC, true)
-
-		oldEnv := a.env
-		a.env = nsEnv
-		
-		// Pre-scan namespace body
-		for _, stmt := range n.Body.Statements {
-			a.preScan(stmt)
-		}
-
-		a.Analyze(n.Body)
-		a.env = oldEnv
-		return "namespace"
 
 	case *ast.StructLiteral:
 		a.env.Set(n.Name.Value, "type", environment.PUBLIC, true)
@@ -724,8 +770,8 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 					for i, arg := range n.Arguments {
 						if i >= len(sig.Params) { break }
 						argType := a.Analyze(arg)
-						expectedType := sig.Params[i]
-						if expectedType != "any" && argType != "any" && expectedType != argType {
+						expectedType := strings.ReplaceAll(sig.Params[i], "::", ".")
+						if expectedType != "any" && argType != "any" && !a.isAssignable(expectedType, argType) {
 							a.error(n.Token, "type mismatch for argument %d of %s: expected %s, got %s", i+1, ident.Value, expectedType, argType)
 						}
 					}
@@ -756,7 +802,25 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 			if ok && sym.Type == "type" {
 				return ident.Value
 			}
-		} else if dot, ok := n.Function.(*ast.InfixExpression); ok && dot.Operator == "." {
+		} else if dot, ok := n.Function.(*ast.InfixExpression); ok && (dot.Operator == "." || dot.Operator == "::") {
+			// Check if it's a namespace call like SocialSystem::User(...)
+			if leftIdent, ok := dot.Left.(*ast.Identifier); ok {
+				if rightIdent, ok := dot.Right.(*ast.Identifier); ok {
+					compoundKey := leftIdent.Value + "." + rightIdent.Value
+					if sym, ok := a.env.Get(compoundKey); ok {
+						if sym.Type == "type" {
+							return compoundKey
+						}
+						if sym.Type == "function" {
+							if sig, ok := a.funcSignatures[compoundKey]; ok {
+								return sig.Return
+							}
+							return "any"
+						}
+					}
+				}
+			}
+
 			// Method call: u.greet()
 			leftType := a.Analyze(dot.Left)
 			if methods, ok := a.structMethods[leftType]; ok {
@@ -767,8 +831,8 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 						} else {
 							for i, arg := range n.Arguments {
 								argType := a.Analyze(arg)
-								expectedType := sig.Params[i]
-								if expectedType != "any" && argType != "any" && expectedType != argType {
+								expectedType := strings.ReplaceAll(sig.Params[i], "::", ".")
+								if expectedType != "any" && argType != "any" && !a.isAssignable(expectedType, argType) {
 									a.error(n.Token, "type mismatch for argument %d of method %s: expected %s, got %s", i+1, rightIdent.Value, expectedType, argType)
 								}
 							}
@@ -796,7 +860,7 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 		}
 		
 		if a.currentReturnType != "" && a.currentReturnType != "any" && retType != "any" {
-			if retType != a.currentReturnType {
+			if !a.isAssignable(a.currentReturnType, retType) {
 				a.error(n.Token, "return type mismatch: expected %s, got %s", a.currentReturnType, retType)
 			}
 		}
@@ -895,20 +959,25 @@ func (a *Analyzer) preScan(stmt ast.Statement) {
 				}
 
 				if expr.Receiver != nil {
-					if a.structMethods[expr.Receiver.Type] == nil {
-						a.structMethods[expr.Receiver.Type] = make(map[string]FunctionSignature)
+					receiverType := strings.ReplaceAll(expr.Receiver.Type, "::", ".")
+					if a.structMethods[receiverType] == nil {
+						a.structMethods[receiverType] = make(map[string]FunctionSignature)
 					}
-					a.structMethods[expr.Receiver.Type][expr.Name.Value] = sig
+					a.structMethods[receiverType][expr.Name.Value] = sig
 				} else {
 					a.funcSignatures[expr.Name.Value] = sig
 				}
 			}
 		case *ast.StructLiteral:
 			a.env.Set(expr.Name.Value, "type", environment.PUBLIC, true)
+			if expr.Parent != nil {
+				a.structParents[expr.Name.Value] = expr.Parent.Value
+			}
 			fields := make(map[string]string)
 			for _, f := range expr.Fields {
 				fields[f.Name.Value] = f.Type
 			}
+			a.structFields[expr.Name.Value] = fields
 			a.structFields[expr.Name.Value] = fields
 		}
 	case *ast.InterfaceStatement:

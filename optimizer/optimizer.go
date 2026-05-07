@@ -85,10 +85,6 @@ func (o *Optimizer) Optimize(node ast.Node) ast.Node {
 		n.Body = o.Optimize(n.Body).(*ast.BlockStatement)
 		return n
 
-	case *ast.NamespaceLiteral:
-		n.Body = o.Optimize(n.Body).(*ast.BlockStatement)
-		return n
-
 	case *ast.InfixExpression:
 		left := o.Optimize(n.Left).(ast.Expression)
 		right := o.Optimize(n.Right).(ast.Expression)

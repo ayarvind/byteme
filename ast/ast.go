@@ -453,25 +453,6 @@ func (ae *AwaitExpression) TokenLiteral() string { return ae.Token.Literal }
 func (ae *AwaitExpression) GetToken() token.Token { return ae.Token }
 func (ae *AwaitExpression) String() string { return "await " + ae.Expression.String() }
 
-type NamespaceLiteral struct {
-	Token      token.Token
-	Name       *Identifier
-	Parent     *Identifier
-	Body       *BlockStatement
-	IsPublic   bool
-}
-func (nl *NamespaceLiteral) expressionNode()      {}
-func (nl *NamespaceLiteral) TokenLiteral() string { return nl.Token.Literal }
-func (nl *NamespaceLiteral) GetToken() token.Token { return nl.Token }
-func (nl *NamespaceLiteral) String() string {
-	var out bytes.Buffer
-	if nl.IsPublic {
-		out.WriteString("public ")
-	}
-	out.WriteString("namespace " + nl.Name.String() + " " + nl.Body.String())
-	return out.String()
-}
-
 type StructLiteral struct {
 	Token          token.Token
 	Name           *Identifier

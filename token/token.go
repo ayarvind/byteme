@@ -48,7 +48,6 @@ const (
 	RBRACKET  TokenType = "]"
 	ARROW     TokenType = "->"
 	DOT       TokenType = "."
-	DOUBLE_COLON TokenType = "::"
 	AT        TokenType = "@"
 	MOD       TokenType = "%"
 
@@ -61,7 +60,6 @@ const (
 	IF        TokenType = "IF"
 	ELSE      TokenType = "ELSE"
 	RETURN    TokenType = "RETURN"
-	NAMESPACE TokenType = "NAMESPACE"
 	PUBLIC    TokenType = "PUBLIC"
 	PRIVATE   TokenType = "PRIVATE"
 	EXTENDS   TokenType = "EXTENDS"
@@ -103,7 +101,6 @@ var keywords = map[string]TokenType{
 	"if":        IF,
 	"else":      ELSE,
 	"return":    RETURN,
-	"namespace": NAMESPACE,
 	"public":    PUBLIC,
 	"private":   PRIVATE,
 	"extends":   EXTENDS,

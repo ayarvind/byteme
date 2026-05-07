@@ -1076,7 +1076,11 @@ var Builtins = []*Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 1 { return NULL }
 			if si, ok := args[0].(*StructInstance); ok {
-				return &String{Value: si.Definition.Name}
+				name := si.Definition.Name
+				if idx := strings.LastIndex(name, "."); idx != -1 {
+					name = name[idx+1:]
+				}
+				return &String{Value: name}
 			}
 			return &String{Value: string(args[0].Type())}
 		},

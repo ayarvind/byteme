@@ -167,20 +167,6 @@ func (c *Compiler) Compile(node ast.Node) error {
 				return fmt.Errorf("right side of '.' must be a field/method name")
 			}
 
-			// Check if left side is a namespace identifier (flat compound symbol)
-			if leftIdent, ok := n.Left.(*ast.Identifier); ok {
-				compoundKey := leftIdent.Value + "." + ident.Value
-				if sym, ok := c.symbolTable.Resolve(compoundKey); ok {
-					// It's a namespace method — emit a direct variable get
-					if sym.Scope == GlobalScope {
-						c.emit(code.OpGetGlobal, sym.Index)
-					} else {
-						c.emit(code.OpGetLocal, sym.Index)
-					}
-					return nil
-				}
-			}
-
 			// Otherwise treat as struct field access
 			err := c.Compile(n.Left)
 			if err != nil {
@@ -660,7 +646,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 	case *ast.Identifier:
 		symbol, ok := c.symbolTable.Resolve(n.Value)
 		if !ok {
-			return fmt.Errorf("undefined variable: %s", n.Value)
+			return fmt.Errorf("undefined variable %s", n.Value)
 		}
 
 		c.loadSymbol(symbol)
@@ -764,9 +750,10 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 		if n.Receiver != nil {
 			// It's a method! Attach it to the struct definition in constants.
+			receiverType := n.Receiver.Type
 			found := false
 			for _, constant := range *c.constants {
-				if sl, ok := constant.(*object.StructLiteral); ok && sl.Name == n.Receiver.Type {
+				if sl, ok := constant.(*object.StructLiteral); ok && sl.Name == receiverType {
 					if sl.Methods == nil {
 						sl.Methods = make(map[string]*object.CompiledFunction)
 					}
@@ -819,143 +806,6 @@ func (c *Compiler) Compile(node ast.Node) error {
 		// that resolves to a StructLiteral in constants — the VM handles this distinction.
 		c.emit(code.OpCall, len(n.Arguments))
 
-	case *ast.NamespaceLiteral:
-		nsName := n.Name.Value
-		// Register the namespace name itself as a symbol (resolves to NULL; its methods live under compound keys)
-		symbol := c.symbolTable.Define(nsName)
-		c.emit(code.OpNull)
-		if symbol.Scope == GlobalScope {
-			c.emit(code.OpSetGlobal, symbol.Index)
-		} else {
-			c.emit(code.OpSetLocal, symbol.Index)
-		}
-
-		// Pass 1: Define all names in the symbol table
-		for _, stmt := range n.Body.Statements {
-			switch s := stmt.(type) {
-			case *ast.LetStatement:
-				compoundName := nsName + "." + s.Name.Value
-				sym := c.symbolTable.Define(compoundName)
-				aliasSym := sym
-				aliasSym.Name = s.Name.Value
-				c.symbolTable.store[s.Name.Value] = aliasSym
-			case *ast.ExpressionStatement:
-				if fnLit, ok := s.Expression.(*ast.FunctionLiteral); ok && fnLit.Name != nil {
-					compoundName := nsName + "." + fnLit.Name.Value
-					sym := c.symbolTable.Define(compoundName)
-					aliasSym := sym
-					aliasSym.Name = fnLit.Name.Value
-					c.symbolTable.store[fnLit.Name.Value] = aliasSym
-				} else if structLit, ok := s.Expression.(*ast.StructLiteral); ok && structLit.Name != nil {
-					compoundName := nsName + "." + structLit.Name.Value
-					sym := c.symbolTable.Define(compoundName)
-					aliasSym := sym
-					aliasSym.Name = structLit.Name.Value
-					c.symbolTable.store[structLit.Name.Value] = aliasSym
-				}
-			case *ast.ConstStatement:
-				compoundName := nsName + "." + s.Name.Value
-				sym := c.symbolTable.Define(compoundName)
-				aliasSym := sym
-				aliasSym.Name = s.Name.Value
-				c.symbolTable.store[s.Name.Value] = aliasSym
-			}
-		}
-
-		// Pass 2: Compile bodies
-		for _, stmt := range n.Body.Statements {
-			switch s := stmt.(type) {
-			case *ast.LetStatement:
-				compoundName := nsName + "." + s.Name.Value
-				if s.Value != nil {
-					err := c.Compile(s.Value)
-					if err != nil {
-						return err
-					}
-				} else {
-					c.emit(code.OpNull)
-				}
-
-				sym, _ := c.symbolTable.Resolve(compoundName)
-				if sym.Scope == GlobalScope {
-					c.emit(code.OpSetGlobal, sym.Index)
-				} else {
-					c.emit(code.OpSetLocal, sym.Index)
-				}
-
-			case *ast.ConstStatement:
-				compoundName := nsName + "." + s.Name.Value
-				err := c.Compile(s.Value)
-				if err != nil {
-					return err
-				}
-
-				sym, _ := c.symbolTable.Resolve(compoundName)
-				if sym.Scope == GlobalScope {
-					c.emit(code.OpSetGlobal, sym.Index)
-				} else {
-					c.emit(code.OpSetLocal, sym.Index)
-				}
-
-			case *ast.ExpressionStatement:
-				if fnLit, ok := s.Expression.(*ast.FunctionLiteral); ok && fnLit.Name != nil {
-					compoundName := nsName + "." + fnLit.Name.Value
-
-					enclosedCompiler := NewEnclosedCompiler(c)
-					for _, p := range fnLit.Parameters {
-						enclosedCompiler.symbolTable.Define(p.Name.Value)
-					}
-					if err := enclosedCompiler.Compile(fnLit.Body); err != nil {
-						return err
-					}
-					if !enclosedCompiler.lastInstructionIs(code.OpReturnValue) && !enclosedCompiler.lastInstructionIs(code.OpReturn) {
-						enclosedCompiler.emit(code.OpReturn)
-					}
-					compiledFn := &object.CompiledFunction{
-						Instructions:  enclosedCompiler.instructions,
-						NumLocals:     enclosedCompiler.symbolTable.numDefinitions,
-						NumParameters: len(fnLit.Parameters),
-						IsAsync:       fnLit.IsAsync,
-						SourceMap:     enclosedCompiler.sourceMap,
-						Name:          compoundName,
-						Filename:      c.Filename,
-					}
-
-					freeSymbols := enclosedCompiler.symbolTable.FreeSymbols
-					for _, s := range freeSymbols {
-						c.loadSymbol(s)
-					}
-					c.emit(code.OpClosure, c.addConstant(compiledFn), len(freeSymbols))
-
-					sym, _ := c.symbolTable.Resolve(compoundName)
-					if sym.Scope == GlobalScope {
-						c.emit(code.OpSetGlobal, sym.Index)
-					} else {
-						c.emit(code.OpSetLocal, sym.Index)
-					}
-				} else if structLit, ok := s.Expression.(*ast.StructLiteral); ok && structLit.Name != nil {
-					compoundName := nsName + "." + structLit.Name.Value
-
-					// Handle StructLiteral: Build object.StructLiteral and Emit OpStructDef
-					fields := make([]*ast.Parameter, len(structLit.Fields))
-					copy(fields, structLit.Fields)
-					structDef := &object.StructLiteral{
-						Name:   structLit.Name.Value,
-						Fields: fields,
-					}
-					constIdx := c.addConstant(structDef)
-					c.emit(code.OpStructDef, constIdx)
-
-					sym, _ := c.symbolTable.Resolve(compoundName)
-					if sym.Scope == GlobalScope {
-						c.emit(code.OpSetGlobal, sym.Index)
-					} else {
-						c.emit(code.OpSetLocal, sym.Index)
-					}
-				}
-			}
-		}
-		c.emit(code.OpNull) // balance for ExpressionStatement OpPop
 
 	case *ast.SpawnExpression:
 		err := c.Compile(n.Call.Function)
@@ -1159,7 +1009,6 @@ func (c *Compiler) extractLine(node ast.Node) int {
 	case *ast.WhileStatement: return n.Token.Line
 	case *ast.CallExpression: return n.Token.Line
 	case *ast.FunctionLiteral: return n.Token.Line
-	case *ast.NamespaceLiteral: return n.Token.Line
 	case *ast.StructLiteral: return n.Token.Line
 	case *ast.TryStatement: return n.Token.Line
 	case *ast.ThrowStatement: return n.Token.Line
@@ -1182,8 +1031,6 @@ func (c *Compiler) preScan(stmt ast.Statement) {
 			if expr.Name != nil {
 				c.symbolTable.Define(expr.Name.Value)
 			}
-		case *ast.NamespaceLiteral:
-			c.symbolTable.Define(expr.Name.Value)
 		}
 	case *ast.InterfaceStatement:
 		c.symbolTable.Define(s.Name.Value)

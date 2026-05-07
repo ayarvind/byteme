@@ -44,7 +44,6 @@ var precedences = map[token.TokenType]int{
 	token.LPAREN:   CALL,
 	token.LBRACKET: INDEX,
 	token.DOT:      ACCESS,
-	token.DOUBLE_COLON: ACCESS,
 }
 
 func (p *Parser) registerParsers() {
@@ -90,7 +89,6 @@ func (p *Parser) registerParsers() {
 	p.registerInfix(token.LBRACKET, p.parseIndexExpression)
 	p.registerInfix(token.ASSIGN, p.parseInfixExpression) // Treat as infix
 	p.registerInfix(token.DOT, p.parseInfixExpression)
-	p.registerInfix(token.DOUBLE_COLON, p.parseInfixExpression)
 }
 
 func (p *Parser) parseArrayLiteral() ast.Expression {
@@ -199,8 +197,6 @@ func (p *Parser) parseStatement() ast.Statement {
 	case token.PUBLIC:
 		p.nextToken() // consume 'public'
 		switch p.curToken.Type {
-		case token.NAMESPACE:
-			return p.parseNamespaceStatement(true)
 		case token.LET:
 			return p.parseLetStatement()
 		case token.CONST:
@@ -212,8 +208,6 @@ func (p *Parser) parseStatement() ast.Statement {
 		default:
 			return nil
 		}
-	case token.NAMESPACE:
-		return p.parseNamespaceStatement(false)
 	case token.STRUCT:
 		return p.parseStructStatement()
 	case token.INTERFACE:
@@ -561,32 +555,6 @@ func (p *Parser) parseReturnStatement() *ast.ReturnStatement {
 	}
 
 	return stmt
-}
-
-func (p *Parser) parseNamespaceStatement(isPublic bool) ast.Statement {
-	stmt := &ast.NamespaceLiteral{Token: p.curToken, IsPublic: isPublic}
-
-	if !p.expectPeek(token.IDENT) {
-		return nil
-	}
-	stmt.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
-
-	if p.peekTokenIs(token.EXTENDS) {
-		p.nextToken()
-		if !p.expectPeek(token.IDENT) {
-			return nil
-		}
-		stmt.Parent = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
-	}
-
-	if !p.expectPeek(token.LBRACE) {
-		return nil
-	}
-
-	stmt.Body = p.parseBlockStatement()
-
-	// Return as expression statement for now or modify Program to accept it
-	return &ast.ExpressionStatement{Token: stmt.Token, Expression: stmt}
 }
 
 func (p *Parser) parseStructStatement() ast.Statement {
@@ -1099,7 +1067,7 @@ func (p *Parser) parseTypeString() string {
 		}
 	}
 
-	for p.peekTokenIs(token.BIT_OR) || p.peekTokenIs(token.DOUBLE_COLON) || p.peekTokenIs(token.DOT) {
+	for p.peekTokenIs(token.BIT_OR) || p.peekTokenIs(token.DOT) {
 		if p.peekTokenIs(token.BIT_OR) {
 			p.nextToken() // |
 			p.nextToken() // cur is next type

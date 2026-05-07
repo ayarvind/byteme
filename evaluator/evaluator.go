@@ -365,13 +365,6 @@ func Eval(node ast.Node, env *environment.Environment) object.Object {
 		args := evalExpressions(n.Arguments, env)
 		return applyFunction(function, args)
 
-	case *ast.NamespaceLiteral:
-		nsEnv := environment.NewEnclosedEnvironment(env)
-		Eval(n.Body, nsEnv)
-		ns := &object.Namespace{Name: n.Name.Value, Env: nsEnv}
-		env.SetVal(n.Name.Value, ns)
-		return ns
-
 	case *ast.StructLiteral:
 		structLit := &object.StructLiteral{Name: n.Name.Value, Fields: n.Fields}
 		
