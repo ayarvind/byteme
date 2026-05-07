@@ -1,0 +1,49 @@
+// ByteMe Website
+// Built using the ByteMe Web Framework (lib/web.byme)
+
+import "lib/web.byme"
+
+let app = Web.new(8080);
+let requestCount = 0;
+
+// Home handler: Renders a template with dynamic context
+fn homeHandler(req) {
+    // Accessing global state (requires OpSetFree logic if this were a closure, 
+    // but here it's a regular function literal compiled into the VM state)
+    requestCount = requestCount + 1;
+    
+    let tmpl = fileRead("templates/index.html");
+    
+    let context = map();
+    mapSet(context, "title", "ByteMe Language");
+    mapSet(context, "heading", "ByteMe Website");
+    mapSet(context, "message", "Welcome to the world of ByteMe. A language built for speed and simplicity.");
+    mapSet(context, "users", "1,250");
+    mapSet(context, "requests", requestCount);
+    
+    let body = Web.render(tmpl, context);
+    return Web.html(body);
+}
+
+// API handler: Returns JSON data
+fn apiHandler(req) {
+    let data = map();
+    mapSet(data, "status", "success");
+    mapSet(data, "version", "1.1.0");
+    mapSet(data, "request_path", mapGet(req, "path"));
+    mapSet(data, "total_requests", requestCount);
+    
+    return Web.json(data);
+}
+
+// Register routes
+Web.route(app, "/", homeHandler);
+Web.route(app, "/api", apiHandler);
+
+println("==========================================");
+println("   ByteMe Web Server Running");
+println("   http://localhost:8080");
+println("   http://localhost:8080/api");
+println("==========================================");
+
+Web.start(app);

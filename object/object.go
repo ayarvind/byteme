@@ -21,6 +21,7 @@ const (
 	FLOAT_OBJ        = "FLOAT"
 	BOOLEAN_OBJ      = "BOOLEAN"
 	STRING_OBJ       = "STRING"
+	CHAR_OBJ         = "CHAR"
 	NULL_OBJ         = "NULL"
 	RETURN_VALUE_OBJ = "RETURN_VALUE"
 	FUNCTION_OBJ     = "FUNCTION"
@@ -56,6 +57,10 @@ type String struct{ Value string }
 func (s *String) Type() ObjectType { return STRING_OBJ }
 func (s *String) Inspect() string  { return s.Value }
 
+type Char struct{ Value rune }
+func (c *Char) Type() ObjectType { return CHAR_OBJ }
+func (c *Char) Inspect() string  { return string(c.Value) }
+
 type Null struct{}
 func (n *Null) Type() ObjectType { return NULL_OBJ }
 func (n *Null) Inspect() string  { return "null" }
@@ -74,10 +79,13 @@ func (f *Function) Type() ObjectType { return FUNCTION_OBJ }
 func (f *Function) Inspect() string  { return "fn" }
 
 type CompiledFunction struct {
-	Instructions []byte
-	NumLocals    int
+	Instructions  []byte
+	NumLocals     int
 	NumParameters int
 	IsAsync       bool
+	SourceMap     map[int]int // offset -> line number
+	Name          string
+	Filename      string
 }
 func (cf *CompiledFunction) Type() ObjectType { return "COMPILED_FUNCTION" }
 func (cf *CompiledFunction) Inspect() string  { return fmt.Sprintf("CompiledFunction[%p]", cf) }

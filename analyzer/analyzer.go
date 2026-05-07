@@ -19,6 +19,16 @@ type Analyzer struct {
 }
 
 func New(env *environment.Environment) *Analyzer {
+	// Register basic types as symbols
+	env.Set("int", "type", environment.PUBLIC, true)
+	env.Set("float", "type", environment.PUBLIC, true)
+	env.Set("string", "type", environment.PUBLIC, true)
+	env.Set("char", "type", environment.PUBLIC, true)
+	env.Set("bool", "type", environment.PUBLIC, true)
+	env.Set("any", "type", environment.PUBLIC, true)
+	env.Set("array", "type", environment.PUBLIC, true)
+	env.Set("map", "type", environment.PUBLIC, true)
+
 	// Register global built-ins
 	env.Set("chan", "function", environment.PUBLIC, true)
 	env.Set("send", "function", environment.PUBLIC, true)
@@ -29,7 +39,7 @@ func New(env *environment.Environment) *Analyzer {
 	env.Set("arrayPush", "function", environment.PUBLIC, true)
 	env.Set("arrayPop", "function", environment.PUBLIC, true)
 	env.Set("arrayShift", "function", environment.PUBLIC, true)
-	env.Set("map", "function", environment.PUBLIC, true)
+	// env.Set("map", "function", environment.PUBLIC, true) // Collides with map type
 	env.Set("mapSet", "function", environment.PUBLIC, true)
 	env.Set("mapGet", "function", environment.PUBLIC, true)
 	env.Set("mapHas", "function", environment.PUBLIC, true)
@@ -65,6 +75,8 @@ func New(env *environment.Environment) *Analyzer {
 	
 	env.Set("toInt",        "function", environment.PUBLIC, true)
 	env.Set("toFloat",      "function", environment.PUBLIC, true)
+	env.Set("toChar",       "function", environment.PUBLIC, true)
+	env.Set("toString",     "function", environment.PUBLIC, true)
 	env.Set("typeof",       "function", environment.PUBLIC, true)
 	env.Set("len",          "function", environment.PUBLIC, true)
 	env.Set("envGet",       "function", environment.PUBLIC, true)
@@ -136,15 +148,6 @@ func New(env *environment.Environment) *Analyzer {
 	env.Set("fWrite",        "function", environment.PUBLIC, true)
 	env.Set("fSeek",         "function", environment.PUBLIC, true)
 	env.Set("instanceOf",    "function", environment.PUBLIC, true)
-
-	// Register basic types as symbols
-	env.Set("int", "type", environment.PUBLIC, true)
-	env.Set("float", "type", environment.PUBLIC, true)
-	env.Set("string", "type", environment.PUBLIC, true)
-	env.Set("bool", "type", environment.PUBLIC, true)
-	env.Set("any", "type", environment.PUBLIC, true)
-	env.Set("array", "type", environment.PUBLIC, true)
-	env.Set("map", "type", environment.PUBLIC, true)
 
 	return &Analyzer{
 		env:           env,
@@ -227,7 +230,7 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 		typeName := n.Type
 		if typeName == "" {
 			typeName = valType
-		} else if typeName != valType && valType != "any" {
+		} else if typeName != valType && typeName != "any" && valType != "any" {
 			// Check if typeName is an interface
 			methods, isInterface := a.interfaces[typeName]
 			if isInterface {
@@ -238,7 +241,7 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 						a.error(n.Token, "type %s does not implement interface %s: missing method %s", valType, typeName, m.Name.Value)
 					}
 				}
-			} else if valType != "array" && typeName != "any" {
+			} else {
 				a.error(n.Token, "type mismatch: cannot assign %s to %s", valType, typeName)
 			}
 		}
@@ -282,6 +285,9 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 	case *ast.StringLiteral:
 		return "string"
 
+	case *ast.CharLiteral:
+		return "char"
+
 	case *ast.BooleanLiteral:
 		return "bool"
 
@@ -297,8 +303,12 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 			return "any"
 		}
 		if n.Operator == "=" {
-			a.Analyze(n.Left)
-			return a.Analyze(n.Right)
+			leftType := a.Analyze(n.Left)
+			rightType := a.Analyze(n.Right)
+			if leftType != "any" && rightType != "any" && leftType != rightType {
+				a.error(n.Token, "type mismatch in assignment: cannot assign %s to %s", rightType, leftType)
+			}
+			return rightType
 		}
 		leftType := a.Analyze(n.Left)
 		rightType := a.Analyze(n.Right)
@@ -424,8 +434,18 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 			a.Analyze(arg)
 		}
 		
-		// If it's a struct constructor, return the struct name
 		if ident, ok := n.Function.(*ast.Identifier); ok {
+			// Built-in return type deduction
+			switch ident.Value {
+			case "map": return "map"
+			case "array": return "array"
+			case "len", "arrayLen", "toInt", "strIndex", "strLastIndex", "strCount": return "int"
+			case "toFloat": return "float"
+			case "toString", "typeof", "strToLower", "strToUpper", "strTrim", "strTrimSpace", "strJoin", "strReplace", "strRepeat", "strTrimLeft", "strTrimRight", "strReverse", "jsonStringify": return "string"
+			case "toChar", "charAt": return "char"
+			case "strContains", "strHasPrefix", "strHasSuffix", "strIsAlpha", "strIsDigit", "strIsSpace", "mapHas", "osExists", "osIsdir", "osIsfile", "regexMatch": return "bool"
+			}
+
 			sym, ok := a.env.Get(ident.Value)
 			if ok && sym.Type == "type" {
 				return ident.Value

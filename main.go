@@ -74,6 +74,7 @@ func main() {
 
 	if *disassemble {
 		comp := compiler.New()
+		comp.Filename = filename
 		err := comp.Compile(optimized)
 		if err != nil {
 			fmt.Printf("Compilation Error: %s\n", err)
@@ -99,6 +100,7 @@ func main() {
 
 	if *compileOnly {
 		comp := compiler.New()
+		comp.Filename = filename
 		err := comp.Compile(optimized)
 		if err != nil {
 			fmt.Printf("Compilation Error: %s\n", err)
@@ -115,6 +117,7 @@ func main() {
 		}
 	} else {
 		comp := compiler.New()
+		comp.Filename = filename
 		err := comp.Compile(optimized)
 		if err != nil {
 			fmt.Printf("Compiler Error: %s\n", err)
@@ -125,6 +128,7 @@ func main() {
 		err = machine.Run()
 		if err != nil {
 			fmt.Printf("VM Error: %s\n", err)
+			fmt.Println(machine.Trace())
 			return
 		}
 

@@ -36,6 +36,9 @@ func NewEnclosedSymbolTable(outer *SymbolTable) *SymbolTable {
 }
 
 func (s *SymbolTable) Define(name string) Symbol {
+	if sym, ok := s.store[name]; ok {
+		return sym
+	}
 	scope := GlobalScope
 	if s.Outer != nil {
 		scope = LocalScope

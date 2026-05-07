@@ -28,9 +28,7 @@ func SetVMContext(constants *[]Object, globals *[]Object) {
 
 // httpRoutes stores registered routes: path → CompiledFunction
 type httpRouteEntry struct {
-	fn      *CompiledFunction
-	constants []Object
-	globals   []Object
+	closure *Closure
 }
 
 var (
@@ -58,6 +56,7 @@ func RegisterHTTPBuiltins() int {
 	// Index start+4: httpResponse(status, body)
 	Builtins = append(Builtins, &Builtin{Fn: builtinHTTPResponse})
 
+	fmt.Printf("[DEBUG] RegisterHTTPBuiltins: start=%d, total=%d\n", start, len(Builtins))
 	return start
 }
 
@@ -69,13 +68,19 @@ func builtinHTTPHandle(args ...Object) Object {
 	if !ok {
 		return &Error{Message: "httpHandle: first argument must be a string path"}
 	}
-	fn, ok := args[1].(*CompiledFunction)
-	if !ok {
-		return &Error{Message: "httpHandle: second argument must be a function"}
+	
+	var closure *Closure
+	switch arg := args[1].(type) {
+	case *CompiledFunction:
+		closure = &Closure{Fn: arg}
+	case *Closure:
+		closure = arg
+	default:
+		return &Error{Message: fmt.Sprintf("httpHandle: second argument must be a function, got %T", args[1])}
 	}
 
 	httpRoutesMu.Lock()
-	httpRoutes[path.Value] = &httpRouteEntry{fn: fn}
+	httpRoutes[path.Value] = &httpRouteEntry{closure: closure}
 	httpRoutesMu.Unlock()
 
 	fmt.Printf("[ByteMe HTTP] Registered route: %s\n", path.Value)
@@ -97,7 +102,11 @@ func builtinHTTPServe(args ...Object) Object {
 	// Register a catch-all handler that dispatches to ByteMe route handlers.
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		httpRoutesMu.RLock()
+		fmt.Printf("[ByteMe HTTP] Request Path: '%s'\n", r.URL.Path)
 		entry, ok := httpRoutes[r.URL.Path]
+		if !ok {
+			fmt.Printf("[ByteMe HTTP] Route not found for: %s. Registered routes: %v\n", r.URL.Path, httpRoutes)
+		}
 		httpRoutesMu.RUnlock()
 
 		if !ok {
@@ -125,7 +134,7 @@ func builtinHTTPServe(args ...Object) Object {
 		var result Object = NULL
 		fmt.Printf("[ByteMe HTTP] Dispatching to handler for: %s\n", r.URL.Path)
 		if RunFunction != nil && vmConstantsPtr != nil && vmGlobalsPtr != nil {
-			result = RunFunction(entry.fn, *vmConstantsPtr, *vmGlobalsPtr, []Object{reqMap})
+			result = RunFunction(entry.closure, *vmConstantsPtr, *vmGlobalsPtr, []Object{reqMap})
 		} else {
 			fmt.Printf("[ByteMe HTTP] ERROR: Runner not initialised (RunFunction: %v, constants: %v, globals: %v)\n", 
 				RunFunction != nil, vmConstantsPtr != nil, vmGlobalsPtr != nil)
@@ -138,6 +147,7 @@ func builtinHTTPServe(args ...Object) Object {
 		body := ""
 		contentType := "text/plain"
 
+		fmt.Printf("[ByteMe HTTP] Handler result type: %T, value: %v\n", result, result.Inspect())
 		if resMap, ok := result.(*Map); ok {
 			if sObj, ok := resMap.Get("status"); ok {
 				if s, ok := sObj.(*Integer); ok {
@@ -160,12 +170,15 @@ func builtinHTTPServe(args ...Object) Object {
 
 		w.Header().Set("Content-Type", contentType)
 		w.WriteHeader(status)
+		fmt.Printf("[ByteMe HTTP] Sending response: status=%d, contentType=%s, bodyLen=%d\n", status, contentType, len(body))
 		fmt.Fprint(w, body)
 	})
 
 	addr := fmt.Sprintf(":%d", port)
 	fmt.Printf("[ByteMe HTTP] Server listening on http://localhost%s\n", addr)
-	if err := http.ListenAndServe(addr, mux); err != nil {
+	err := http.ListenAndServe(addr, mux)
+	fmt.Printf("[ByteMe HTTP] Server exited: %v\n", err)
+	if err != nil {
 		return &Error{Message: "httpServe: " + err.Error()}
 	}
 	return NULL

@@ -52,6 +52,7 @@ func (p *Parser) registerParsers() {
 	p.registerPrefix(token.INT, p.parseIntegerLiteral)
 	p.registerPrefix(token.FLOAT, p.parseFloatLiteral)
 	p.registerPrefix(token.STRING, p.parseStringLiteral)
+	p.registerPrefix(token.CHAR, p.parseCharLiteral)
 	p.registerPrefix(token.BANG, p.parsePrefixExpression)
 	p.registerPrefix(token.MINUS, p.parsePrefixExpression)
 	p.registerPrefix(token.BIT_NOT, p.parsePrefixExpression)
@@ -605,6 +606,13 @@ func (p *Parser) parseFloatLiteral() ast.Expression {
 
 	lit.Value = value
 	return lit
+}
+
+func (p *Parser) parseCharLiteral() ast.Expression {
+	if len(p.curToken.Literal) == 0 {
+		return &ast.CharLiteral{Token: p.curToken, Value: 0}
+	}
+	return &ast.CharLiteral{Token: p.curToken, Value: rune(p.curToken.Literal[0])}
 }
 
 func (p *Parser) parseStringLiteral() ast.Expression {

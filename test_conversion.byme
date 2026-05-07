@@ -1,0 +1,26 @@
+fn main() {
+    let c = 'B';
+    let s = "ByteMe";
+    
+    println("Character:", c);
+    println("Type of c:", typeof(c));
+    
+    // Type conversion
+    let i = int(65.5);
+    println("int(65.5) =", i);
+    
+    let c2 = char(i);
+    println("char(65) =", c2);
+    
+    let s2 = string(c2);
+    println("string('A') =", s2);
+    
+    let f = float(i);
+    println("float(65) =", f);
+    
+    // Multi-char string to char
+    let first = char("Hello");
+    println("char('Hello') =", first);
+}
+
+main();

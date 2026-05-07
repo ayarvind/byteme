@@ -11,6 +11,7 @@ const (
 	INT    TokenType = "INT"    // 1343456
 	FLOAT  TokenType = "FLOAT"  // 12.34
 	STRING TokenType = "STRING" // "hello world"
+	CHAR   TokenType = "CHAR"   // 'a'
 
 	// Operators
 	ASSIGN   TokenType = "="

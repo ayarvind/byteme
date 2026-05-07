@@ -64,7 +64,13 @@ func (o *Optimizer) Optimize(node ast.Node) ast.Node {
 			}
 		}
 		
-		n.Consequence = o.Optimize(n.Consequence).(*ast.BlockStatement)
+		optimizedCons := o.Optimize(n.Consequence)
+		if optimizedCons != nil {
+			n.Consequence = optimizedCons.(*ast.BlockStatement)
+		} else {
+			n.Consequence = &ast.BlockStatement{Statements: []ast.Statement{}}
+		}
+
 		if n.Alternative != nil {
 			alt := o.Optimize(n.Alternative)
 			if alt != nil {

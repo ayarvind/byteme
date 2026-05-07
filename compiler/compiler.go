@@ -3,7 +3,7 @@ package compiler
 import (
 	"fmt"
 	"io/ioutil"
-	
+
 	"github.com/byteme/compiler/ast"
 	"github.com/byteme/compiler/code"
 	"github.com/byteme/compiler/lexer"
@@ -15,6 +15,9 @@ import (
 type Bytecode struct {
 	Instructions code.Instructions
 	Constants    []object.Object
+	SourceMap    map[int]int
+	Filename     string
+	NumLocals    int
 }
 
 type EmittedInstruction struct {
@@ -23,10 +26,13 @@ type EmittedInstruction struct {
 }
 
 type Compiler struct {
-	instructions     code.Instructions
-	constants        *[]object.Object
-	symbolTable      *SymbolTable
-	lastInstruction  EmittedInstruction
+	instructions    code.Instructions
+	constants       *[]object.Object
+	symbolTable     *SymbolTable
+	lastInstruction EmittedInstruction
+	sourceMap       map[int]int
+	currentNode     ast.Node
+	Filename        string
 }
 
 func New() *Compiler {
@@ -35,6 +41,7 @@ func New() *Compiler {
 		instructions: code.Instructions{},
 		constants:    &constants,
 		symbolTable:  NewSymbolTable(),
+		sourceMap:    make(map[int]int),
 	}
 
 	for name, index := range builtins {
@@ -49,17 +56,29 @@ func NewWithState(s *SymbolTable, constants *[]object.Object) *Compiler {
 		instructions: code.Instructions{},
 		constants:    constants,
 		symbolTable:  s,
+		sourceMap:    make(map[int]int),
 	}
 }
 
 func NewEnclosedCompiler(outer *Compiler) *Compiler {
 	s := NewEnclosedSymbolTable(outer.symbolTable)
-	return NewWithState(s, outer.constants)
+	c := NewWithState(s, outer.constants)
+	c.Filename = outer.Filename
+	return c
 }
 
 func (c *Compiler) Compile(node ast.Node) error {
+	if node == nil { return nil }
+	oldNode := c.currentNode
+	c.currentNode = node
+	defer func() { c.currentNode = oldNode }()
+
 	switch n := node.(type) {
 	case *ast.Program:
+		// Pre-scan pass
+		for _, s := range n.Statements {
+			c.preScan(s)
+		}
 		for _, s := range n.Statements {
 			err := c.Compile(s)
 			if err != nil {
@@ -73,31 +92,37 @@ func (c *Compiler) Compile(node ast.Node) error {
 		if err != nil {
 			return fmt.Errorf("could not read imported file %s: %s", filename, err)
 		}
-		
+
 		l := lexer.New(string(input))
 		p := parser.New(l)
 		program := p.ParseProgram()
-		
+
 		if len(p.Errors()) != 0 {
 			return fmt.Errorf("parser errors in imported file %s: %v", filename, p.Errors())
 		}
-		
+
 		// If it's a 'from' import, we hide the module's variables from the global scope,
 		// except for the specifically imported ones.
 		var savedStore map[string]Symbol
 		if n.Token.Type == token.FROM {
 			savedStore = make(map[string]Symbol)
-			for k, v := range c.symbolTable.store { savedStore[k] = v }
+			for k, v := range c.symbolTable.store {
+				savedStore[k] = v
+			}
 		}
 
 		err = c.Compile(program)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 
 		if n.Token.Type == token.FROM {
 			newStore := make(map[string]Symbol)
 			// keep original globals
-			for k, v := range savedStore { newStore[k] = v }
-			
+			for k, v := range savedStore {
+				newStore[k] = v
+			}
+
 			// keep specifically imported symbols
 			for _, imp := range n.Imports {
 				if sym, ok := c.symbolTable.store[imp.Value]; ok {
@@ -113,7 +138,9 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 	case *ast.ReturnStatement:
 		err := c.Compile(n.ReturnValue)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		c.emit(code.OpReturnValue)
 
 	case *ast.ExpressionStatement:
@@ -147,7 +174,9 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 			// Otherwise treat as struct field access
 			err := c.Compile(n.Left)
-			if err != nil { return err }
+			if err != nil {
+				return err
+			}
 			fieldNameIdx := c.addConstant(&object.String{Value: ident.Value})
 			c.emit(code.OpGetField, fieldNameIdx)
 			return nil
@@ -158,7 +187,9 @@ func (c *Compiler) Compile(node ast.Node) error {
 			switch left := n.Left.(type) {
 			case *ast.Identifier:
 				err := c.Compile(n.Right)
-				if err != nil { return err }
+				if err != nil {
+					return err
+				}
 
 				symbol, ok := c.symbolTable.Resolve(left.Value)
 				if !ok {
@@ -177,15 +208,19 @@ func (c *Compiler) Compile(node ast.Node) error {
 				if left.Operator == "." {
 					if ident, ok := left.Right.(*ast.Identifier); ok {
 						err := c.Compile(left.Left) // Push the struct instance FIRST
-						if err != nil { return err }
+						if err != nil {
+							return err
+						}
 
 						err = c.Compile(n.Right) // Push the value SECOND
-						if err != nil { return err }
+						if err != nil {
+							return err
+						}
 
 						fieldNameIdx := c.addConstant(&object.String{Value: ident.Value})
 						c.emit(code.OpSetField, fieldNameIdx)
-						
-						// OpSetField pushes the instance back. 
+
+						// OpSetField pushes the instance back.
 						// If we don't emit anything else, the ExpressionStatement will OpPop the instance, leaving stack balanced.
 						return nil
 					}
@@ -193,14 +228,20 @@ func (c *Compiler) Compile(node ast.Node) error {
 				return fmt.Errorf("invalid assignment target")
 			case *ast.IndexExpression: // Array access like `arr[0] = ...`
 				err := c.Compile(left.Left) // Push the array FIRST
-				if err != nil { return err }
-				
+				if err != nil {
+					return err
+				}
+
 				err = c.Compile(left.Index) // Push the index SECOND
-				if err != nil { return err }
-				
+				if err != nil {
+					return err
+				}
+
 				err = c.Compile(n.Right) // Push the value THIRD
-				if err != nil { return err }
-				
+				if err != nil {
+					return err
+				}
+
 				c.emit(code.OpSetIndex)
 				return nil
 			default:
@@ -211,19 +252,27 @@ func (c *Compiler) Compile(node ast.Node) error {
 		// Reordering for LessThan logic
 		if n.Operator == "<" {
 			err := c.Compile(n.Right)
-			if err != nil { return err }
+			if err != nil {
+				return err
+			}
 			err = c.Compile(n.Left)
-			if err != nil { return err }
+			if err != nil {
+				return err
+			}
 			c.emit(code.OpGreaterThan)
 			return nil
 		}
-		
+
 		if n.Operator == "<=" {
 			// left <= right  -> !(left > right)
 			err := c.Compile(n.Left)
-			if err != nil { return err }
+			if err != nil {
+				return err
+			}
 			err = c.Compile(n.Right)
-			if err != nil { return err }
+			if err != nil {
+				return err
+			}
 			c.emit(code.OpGreaterThan)
 			c.emit(code.OpBang)
 			return nil
@@ -232,9 +281,13 @@ func (c *Compiler) Compile(node ast.Node) error {
 		if n.Operator == ">=" {
 			// left >= right -> !(left < right) -> !(right > left)
 			err := c.Compile(n.Right)
-			if err != nil { return err }
+			if err != nil {
+				return err
+			}
 			err = c.Compile(n.Left)
-			if err != nil { return err }
+			if err != nil {
+				return err
+			}
 			c.emit(code.OpGreaterThan)
 			c.emit(code.OpBang)
 			return nil
@@ -309,6 +362,10 @@ func (c *Compiler) Compile(node ast.Node) error {
 		str := &object.String{Value: n.Value}
 		c.emit(code.OpConstant, c.addConstant(str))
 
+	case *ast.CharLiteral:
+		char := &object.Char{Value: n.Value}
+		c.emit(code.OpConstant, c.addConstant(char))
+
 	case *ast.BooleanLiteral:
 		if n.Value {
 			c.emit(code.OpTrue)
@@ -322,13 +379,30 @@ func (c *Compiler) Compile(node ast.Node) error {
 	case *ast.ArrayLiteral:
 		for _, el := range n.Elements {
 			err := c.Compile(el)
-			if err != nil { return err }
+			if err != nil {
+				return err
+			}
 		}
 		c.emit(code.OpArray, len(n.Elements))
 
+	case *ast.ConstStatement:
+		err := c.Compile(n.Value)
+		if err != nil {
+			return err
+		}
+		symbol := c.symbolTable.Define(n.Name.Value)
+		if symbol.Scope == GlobalScope {
+			c.emit(code.OpSetGlobal, symbol.Index)
+		} else {
+			c.emit(code.OpSetLocal, symbol.Index)
+		}
+		return nil
+
 	case *ast.LetStatement:
 		err := c.Compile(n.Value)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		symbol := c.symbolTable.Define(n.Name.Value)
 		if symbol.Scope == GlobalScope {
 			c.emit(code.OpSetGlobal, symbol.Index)
@@ -339,17 +413,21 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 	case *ast.IfExpression:
 		err := c.Compile(n.Condition)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 
 		// Emit jump with placeholder
 		jumpNotTruthyPos := c.emit(code.OpJumpNotTruthy, 9999)
 
 		err = c.Compile(n.Consequence)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 
 		// Remove the pop if it was an expression statement? No, the VM needs to be consistent.
 		// For now, if consequence is empty, we might have issues.
-		
+
 		if n.Alternative == nil {
 			afterConsequencePos := len(c.instructions)
 			c.changeOperand(jumpNotTruthyPos, afterConsequencePos)
@@ -357,13 +435,15 @@ func (c *Compiler) Compile(node ast.Node) error {
 			c.emit(code.OpNull) // Placeholder for 'if' result
 		} else {
 			jumpPos := c.emit(code.OpJump, 9999)
-			
+
 			afterConsequencePos := len(c.instructions)
 			c.changeOperand(jumpNotTruthyPos, afterConsequencePos)
-			
+
 			err = c.Compile(n.Alternative)
-			if err != nil { return err }
-			
+			if err != nil {
+				return err
+			}
+
 			afterAlternativePos := len(c.instructions)
 			c.changeOperand(jumpPos, afterAlternativePos)
 		}
@@ -372,12 +452,16 @@ func (c *Compiler) Compile(node ast.Node) error {
 	case *ast.WhileStatement:
 		startPos := len(c.instructions)
 		err := c.Compile(n.Condition)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 
 		jumpNotTruthyPos := c.emit(code.OpJumpNotTruthy, 9999)
 
 		err = c.Compile(n.Body)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 
 		c.emit(code.OpJump, startPos)
 
@@ -386,28 +470,38 @@ func (c *Compiler) Compile(node ast.Node) error {
 		c.emit(code.OpNull) // Ensure expression statement balanced
 
 	case *ast.BlockStatement:
+		// Pre-scan pass
+		for _, s := range n.Statements {
+			c.preScan(s)
+		}
 		for _, s := range n.Statements {
 			err := c.Compile(s)
-			if err != nil { return err }
+			if err != nil {
+				return err
+			}
 		}
 
 	case *ast.ThrowStatement:
 		err := c.Compile(n.Value)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		c.emit(code.OpThrow)
 
 	case *ast.TryStatement:
 		jumpToCatchPos := c.emit(code.OpTry, 9999)
-		
+
 		err := c.Compile(n.Body)
-		if err != nil { return err }
-		
+		if err != nil {
+			return err
+		}
+
 		c.emit(code.OpEndTry)
 		jumpToEndPos := c.emit(code.OpJump, 9999)
-		
+
 		catchPos := len(c.instructions)
 		c.changeOperand(jumpToCatchPos, catchPos)
-		
+
 		if n.CatchBody != nil {
 			// Catch variable is pushed onto the stack by OpThrow in VM
 			symbol := c.symbolTable.Define(n.CatchVar.Value)
@@ -416,19 +510,23 @@ func (c *Compiler) Compile(node ast.Node) error {
 			} else {
 				c.emit(code.OpSetLocal, symbol.Index)
 			}
-			
+
 			err = c.Compile(n.CatchBody)
-			if err != nil { return err }
+			if err != nil {
+				return err
+			}
 		} else {
 			c.emit(code.OpPop)
 		}
-		
+
 		endPos := len(c.instructions)
 		c.changeOperand(jumpToEndPos, endPos)
-		
+
 		if n.Finally != nil {
 			err = c.Compile(n.Finally)
-			if err != nil { return err }
+			if err != nil {
+				return err
+			}
 		}
 
 	case *ast.Identifier:
@@ -436,7 +534,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 		if !ok {
 			return fmt.Errorf("undefined variable: %s", n.Value)
 		}
-		
+
 		c.loadSymbol(symbol)
 
 	case *ast.StructLiteral:
@@ -505,20 +603,32 @@ func (c *Compiler) Compile(node ast.Node) error {
 		}
 
 		err := enclosedCompiler.Compile(n.Body)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 
 		if !enclosedCompiler.lastInstructionIs(code.OpReturnValue) && !enclosedCompiler.lastInstructionIs(code.OpReturn) {
 			enclosedCompiler.emit(code.OpReturn)
 		}
 
 		numParams := len(n.Parameters)
-		if n.Receiver != nil { numParams++ }
+		if n.Receiver != nil {
+			numParams++
+		}
+
+		var fnName string
+		if n.Name != nil {
+			fnName = n.Name.Value
+		}
 
 		compiledFn := &object.CompiledFunction{
 			Instructions:  enclosedCompiler.instructions,
 			NumLocals:     enclosedCompiler.symbolTable.numDefinitions,
 			NumParameters: numParams,
 			IsAsync:       n.IsAsync,
+			SourceMap:     enclosedCompiler.sourceMap,
+			Name:          fnName,
+			Filename:      c.Filename,
 		}
 
 		if n.Receiver != nil {
@@ -540,11 +650,11 @@ func (c *Compiler) Compile(node ast.Node) error {
 			// Emit OpNull so that the wrapping expression statement is balanced
 			c.emit(code.OpNull)
 		} else {
-		freeSymbols := enclosedCompiler.symbolTable.FreeSymbols
-		for _, s := range freeSymbols {
-			c.loadSymbol(s)
-		}
-		c.emit(code.OpClosure, c.addConstant(compiledFn), len(freeSymbols))
+			freeSymbols := enclosedCompiler.symbolTable.FreeSymbols
+			for _, s := range freeSymbols {
+				c.loadSymbol(s)
+			}
+			c.emit(code.OpClosure, c.addConstant(compiledFn), len(freeSymbols))
 
 			if n.Name != nil {
 				symbol, _ := c.symbolTable.Resolve(n.Name.Value)
@@ -561,11 +671,15 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 	case *ast.CallExpression:
 		err := c.Compile(n.Function)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 
 		for _, arg := range n.Arguments {
 			err := c.Compile(arg)
-			if err != nil { return err }
+			if err != nil {
+				return err
+			}
 		}
 
 		// If the callee is a StructLiteral (resolved from symbol table),
@@ -623,8 +737,10 @@ func (c *Compiler) Compile(node ast.Node) error {
 			case *ast.LetStatement:
 				compoundName := nsName + "." + s.Name.Value
 				err := c.Compile(s.Value)
-				if err != nil { return err }
-				
+				if err != nil {
+					return err
+				}
+
 				sym, _ := c.symbolTable.Resolve(compoundName)
 				if sym.Scope == GlobalScope {
 					c.emit(code.OpSetGlobal, sym.Index)
@@ -635,8 +751,10 @@ func (c *Compiler) Compile(node ast.Node) error {
 			case *ast.ConstStatement:
 				compoundName := nsName + "." + s.Name.Value
 				err := c.Compile(s.Value)
-				if err != nil { return err }
-				
+				if err != nil {
+					return err
+				}
+
 				sym, _ := c.symbolTable.Resolve(compoundName)
 				if sym.Scope == GlobalScope {
 					c.emit(code.OpSetGlobal, sym.Index)
@@ -647,12 +765,14 @@ func (c *Compiler) Compile(node ast.Node) error {
 			case *ast.ExpressionStatement:
 				if fnLit, ok := s.Expression.(*ast.FunctionLiteral); ok && fnLit.Name != nil {
 					compoundName := nsName + "." + fnLit.Name.Value
-					
+
 					enclosedCompiler := NewEnclosedCompiler(c)
 					for _, p := range fnLit.Parameters {
 						enclosedCompiler.symbolTable.Define(p.Name.Value)
 					}
-					if err := enclosedCompiler.Compile(fnLit.Body); err != nil { return err }
+					if err := enclosedCompiler.Compile(fnLit.Body); err != nil {
+						return err
+					}
 					if !enclosedCompiler.lastInstructionIs(code.OpReturnValue) && !enclosedCompiler.lastInstructionIs(code.OpReturn) {
 						enclosedCompiler.emit(code.OpReturn)
 					}
@@ -661,14 +781,17 @@ func (c *Compiler) Compile(node ast.Node) error {
 						NumLocals:     enclosedCompiler.symbolTable.numDefinitions,
 						NumParameters: len(fnLit.Parameters),
 						IsAsync:       fnLit.IsAsync,
+						SourceMap:     enclosedCompiler.sourceMap,
+						Name:          compoundName,
+						Filename:      c.Filename,
 					}
-					
+
 					freeSymbols := enclosedCompiler.symbolTable.FreeSymbols
 					for _, s := range freeSymbols {
 						c.loadSymbol(s)
 					}
 					c.emit(code.OpClosure, c.addConstant(compiledFn), len(freeSymbols))
-					
+
 					sym, _ := c.symbolTable.Resolve(compoundName)
 					if sym.Scope == GlobalScope {
 						c.emit(code.OpSetGlobal, sym.Index)
@@ -677,7 +800,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 					}
 				} else if structLit, ok := s.Expression.(*ast.StructLiteral); ok && structLit.Name != nil {
 					compoundName := nsName + "." + structLit.Name.Value
-					
+
 					// Handle StructLiteral: Build object.StructLiteral and Emit OpStructDef
 					fields := make([]*ast.Parameter, len(structLit.Fields))
 					copy(fields, structLit.Fields)
@@ -687,7 +810,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 					}
 					constIdx := c.addConstant(structDef)
 					c.emit(code.OpStructDef, constIdx)
-					
+
 					sym, _ := c.symbolTable.Resolve(compoundName)
 					if sym.Scope == GlobalScope {
 						c.emit(code.OpSetGlobal, sym.Index)
@@ -701,25 +824,35 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 	case *ast.SpawnExpression:
 		err := c.Compile(n.Call.Function)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 
 		for _, arg := range n.Call.Arguments {
 			err := c.Compile(arg)
-			if err != nil { return err }
+			if err != nil {
+				return err
+			}
 		}
 
 		c.emit(code.OpSpawn, len(n.Call.Arguments))
 
 	case *ast.AwaitExpression:
 		err := c.Compile(n.Expression)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		c.emit(code.OpAwait)
 
 	case *ast.IndexExpression:
 		err := c.Compile(n.Left)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		err = c.Compile(n.Index)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		c.emit(code.OpIndex)
 	}
 
@@ -767,73 +900,84 @@ var builtins = map[string]int{
 	"pathDir":       37,
 	"fileOpen":      38,
 	"fileClose":     39,
+	"fRead":         40,
+	"fWrite":        41,
 	"fileSeek":      42,
 	"instanceOf":    43,
-	"charAt":        45,
-	"toInt":         46,
-	"toFloat":       47,
-	"mathSin":       48,
-	"mathCos":       49,
-	"mathTan":       50,
-	"mathSqrt":      51,
-	"mathPow":       52,
-	"mathLog":       53,
-	"mathLog10":     54,
-	"mathExp":       55,
-	"mathAsin":      56,
-	"mathAcos":      57,
-	"mathAtan":      58,
-	"mathAtan2":     59,
-	"mathAbs":       60,
-	"mathCeil":      61,
-	"mathFloor":     62,
-	"strToLower":    63,
-	"strToUpper":    64,
-	"strTrim":       65,
-	"strTrimSpace":  66,
-	"strSplit":      67,
-	"strJoin":       68,
-	"strContains":   69,
-	"strHasPrefix":  70,
-	"strHasSuffix":  71,
-	"strIndex":      72,
-	"strLastIndex":  73,
-	"strReplace":    74,
-	"strRepeat":     75,
-	"strCount":      76,
-	"strFields":     77,
-	"strTrimLeft":   78,
-	"strTrimRight":  79,
-	"strIsAlpha":    80,
-	"strIsDigit":    81,
-	"strIsSpace":    82,
-	"strReverse":    83,
-	"ioReadInput":   84,
-	"arrayPush":     85,
-	"arrayPop":      86,
-	"arraySlice":    87,
-	"arraySort":     88,
-	"mapDelete":     89,
-	"mapKeys":       90,
-	"mapValues":     91,
-	"timeParse":     92,
-	"strReplaceAll": 93,
-	"timeAdd":       94,
-	"timeSub":       95,
-	"timeDiff":      96,
-	"timeInLocation": 97,
-	"typeof":         98,
-	"httpHandle":    99,
-	"httpServe":     100,
-	"httpGet":       101,
-	"httpPost":      102,
-	"httpResponse":  103,
+	"charAt":        44,
+	"toInt":         45,
+	"toFloat":       46,
+	"mathSin":       47,
+	"mathCos":       48,
+	"mathTan":       49,
+	"mathSqrt":      50,
+	"mathPow":       51,
+	"mathLog":       52,
+	"mathLog10":     53,
+	"mathExp":       54,
+	"mathAsin":      55,
+	"mathAcos":      56,
+	"mathAtan":      57,
+	"mathAtan2":     58,
+	"mathAbs":       59,
+	"mathCeil":      60,
+	"mathFloor":     61,
+	"strToLower":    62,
+	"strToUpper":    63,
+	"strTrim":       64,
+	"strTrimSpace":  65,
+	"strSplit":      66,
+	"strJoin":       67,
+	"strContains":   68,
+	"strHasPrefix":  69,
+	"strHasSuffix":  70,
+	"strIndex":      71,
+	"strLastIndex":  72,
+	"strReplace":    73,
+	"strRepeat":     74,
+	"strCount":      75,
+	"strFields":     76,
+	"strTrimLeft":   77,
+	"strTrimRight":  78,
+	"strIsAlpha":    79,
+	"strIsDigit":    80,
+	"strIsSpace":    81,
+	"strReverse":    82,
+	"ioReadInput":   83,
+	"arrayPush":     84,
+	"arrayPop":      85,
+	"arraySlice":    86,
+	"arraySort":     87,
+	"mapDelete":     88,
+	"mapKeys":       89,
+	"mapValues":     90,
+	"timeParse":     91,
+	"strReplaceAll": 92,
+	"timeAdd":       93,
+	"timeSub":       94,
+	"timeDiff":      95,
+	"timeInLocation": 96,
+	"typeof":         97,
+	"toChar":         98,
+	"toString":       99,
+	"httpHandle":    100,
+	"httpServe":     101,
+	"httpGet":       102,
+	"httpPost":      103,
+	"httpResponse":  104,
+	"int":           45,
+	"float":         46,
+	"string":        99,
+	"char":          98,
 }
 
 func (c *Compiler) Bytecode() *Bytecode {
 	return &Bytecode{
 		Instructions: c.instructions,
 		Constants:    *c.constants,
+		SourceMap:    c.sourceMap,
+		Filename:     c.Filename,
+		NumLocals:    c.symbolTable.numDefinitions,
 	}
 }
 
@@ -848,7 +992,68 @@ func (c *Compiler) emit(op code.Opcode, operands ...int) int {
 
 	c.lastInstruction = EmittedInstruction{Opcode: op, Position: pos}
 
+	if c.currentNode != nil {
+		// Try to extract line number from node. Many ast nodes have a Token field.
+		// We use reflection or just check known types.
+		line := c.extractLine(c.currentNode)
+		if line > 0 {
+			c.sourceMap[pos] = line
+		}
+	}
+
 	return pos
+}
+
+func (c *Compiler) extractLine(node ast.Node) int {
+	switch n := node.(type) {
+	case *ast.LetStatement: return n.Token.Line
+	case *ast.ConstStatement: return n.Token.Line
+	case *ast.ReturnStatement: return n.Token.Line
+	case *ast.ExpressionStatement: return n.Token.Line
+	case *ast.InfixExpression: return n.Token.Line
+	case *ast.PrefixExpression: return n.Token.Line
+	case *ast.IntegerLiteral: return n.Token.Line
+	case *ast.FloatLiteral: return n.Token.Line
+	case *ast.StringLiteral: return n.Token.Line
+	case *ast.CharLiteral: return n.Token.Line
+	case *ast.BooleanLiteral: return n.Token.Line
+	case *ast.ArrayLiteral: return n.Token.Line
+	case *ast.Identifier: return n.Token.Line
+	case *ast.IfExpression: return n.Token.Line
+	case *ast.WhileStatement: return n.Token.Line
+	case *ast.CallExpression: return n.Token.Line
+	case *ast.FunctionLiteral: return n.Token.Line
+	case *ast.NamespaceLiteral: return n.Token.Line
+	case *ast.StructLiteral: return n.Token.Line
+	case *ast.TryStatement: return n.Token.Line
+	case *ast.ThrowStatement: return n.Token.Line
+	case *ast.SpawnExpression: return n.Token.Line
+	case *ast.AwaitExpression: return n.Token.Line
+	case *ast.IndexExpression: return n.Token.Line
+	}
+	return 0
+}
+
+func (c *Compiler) preScan(stmt ast.Statement) {
+	switch s := stmt.(type) {
+	case *ast.ExpressionStatement:
+		switch expr := s.Expression.(type) {
+		case *ast.FunctionLiteral:
+			if expr.Name != nil {
+				c.symbolTable.Define(expr.Name.Value)
+			}
+		case *ast.StructLiteral:
+			if expr.Name != nil {
+				c.symbolTable.Define(expr.Name.Value)
+			}
+		case *ast.NamespaceLiteral:
+			c.symbolTable.Define(expr.Name.Value)
+		}
+	case *ast.InterfaceStatement:
+		c.symbolTable.Define(s.Name.Value)
+	case *ast.EnumStatement:
+		c.symbolTable.Define(s.Name.Value)
+	}
 }
 
 func (c *Compiler) lastInstructionIs(op code.Opcode) bool {

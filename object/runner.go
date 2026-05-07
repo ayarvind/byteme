@@ -5,4 +5,4 @@ package object
 // creating a hard import cycle between object ↔ vm.
 //
 // Signature: RunFunction(fn, constants, globals, args) → result Object
-var RunFunction func(fn *CompiledFunction, constants []Object, globals []Object, args []Object) Object
+var RunFunction func(closure *Closure, constants []Object, globals []Object, args []Object) Object

@@ -1,15 +1,31 @@
-// test_async.byme
-async fn compute(x, y) {
-    println("Thinking...");
-    timeSleep(1000);
-    println("Done thinking!");
-    return x + y;
+
+
+async fn produce(ch) {
+    let i = 0;
+    while (i < 10) {
+        let msg = "MSG_" + i;
+        println("Producing:", msg);
+        send(ch, msg);
+        i = i + 1;
+    }
+    close(ch);
+    return 0;
 }
 
-println("Starting async test...");
-let future = compute(10, 20);
-println("Got future, doing other things...");
+async fn consume(ch) {
+    while (true) {
+        let msg = recv(ch);
+        if (msg == null) {
+            break;
+        }
+        println("Consuming:", msg);
+    }
+    return 0;
+}
 
-println("Waiting for result...");
-let result = await future;
-println("Result is:", result);
+fn main() {
+    let ch = chan();
+    spawn produce(ch);
+    spawn consume(ch);
+    return 0;
+}

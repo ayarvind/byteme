@@ -141,6 +141,12 @@ func (l *Lexer) NextToken() token.Token {
 		tok = l.newToken(token.AT, l.ch)
 	case '%':
 		tok = l.newToken(token.MOD, l.ch)
+	case '\'':
+		tok.Type = token.CHAR
+		tok.Literal = l.readCharLiteral()
+		tok.Line = startLine
+		tok.Column = startColumn
+		return tok
 	case '"':
 		tok.Type = token.STRING
 		tok.Literal = l.readString()
@@ -231,6 +237,29 @@ func (l *Lexer) readString() string {
 		l.readChar()
 	}
 	return string(out)
+}
+
+func (l *Lexer) readCharLiteral() string {
+	l.readChar() // skip opening quote
+	var ch byte
+	if l.ch == '\\' {
+		l.readChar()
+		switch l.ch {
+		case 'n': ch = '\n'
+		case 't': ch = '\t'
+		case 'r': ch = '\r'
+		case '\'': ch = '\''
+		case '\\': ch = '\\'
+		default: ch = l.ch
+		}
+	} else {
+		ch = l.ch
+	}
+	l.readChar() // consume the character
+	if l.ch == '\'' {
+		l.readChar() // consume closing quote
+	}
+	return string(ch)
 }
 
 func isLetter(ch byte) bool {

@@ -124,12 +124,6 @@ public namespace String {
         return s + strRepeat(padChar, diff);
     }
 
-    // Returns the length of the string
-    public fn len(s) { return len(s); }
-
-    // Returns the character at the specified index
-    public fn charAt(s, i) { return charAt(s, i); }
-
     // Returns a substring of s from start up to (but not including) end.
     public fn substring(s, start, end) {
         if (start < 0) { start = 0; }
@@ -140,6 +134,7 @@ public namespace String {
         let res = "";
         let i = start;
         while (i < end) {
+            // Use the global charAt builtin
             res = res + charAt(s, i);
             i = i + 1;
         }

@@ -218,6 +218,14 @@ func (sl *StringLiteral) expressionNode()      {}
 func (sl *StringLiteral) TokenLiteral() string { return sl.Token.Literal }
 func (sl *StringLiteral) String() string       { return sl.Token.Literal }
 
+type CharLiteral struct {
+	Token token.Token
+	Value rune
+}
+func (cl *CharLiteral) expressionNode()      {}
+func (cl *CharLiteral) TokenLiteral() string { return cl.Token.Literal }
+func (cl *CharLiteral) String() string       { return cl.Token.Literal }
+
 type BooleanLiteral struct {
 	Token token.Token
 	Value bool

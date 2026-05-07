@@ -412,7 +412,7 @@ var Builtins = []*Builtin{
 			return NULL
 		},
 	},
-	{ // 39: fileRead
+	{ // 39: fRead
 		Fn: func(args ...Object) Object {
 			if len(args) < 1 { return NULL }
 			handle, ok := args[0].(*FileHandle)
@@ -434,7 +434,7 @@ var Builtins = []*Builtin{
 			return &String{Value: string(buf[:count])}
 		},
 	},
-	{ // 40: fileWrite
+	{ // 40: fWrite
 		Fn: func(args ...Object) Object {
 			if len(args) != 2 { return NULL }
 			handle, ok := args[0].(*FileHandle)
@@ -489,19 +489,7 @@ var Builtins = []*Builtin{
 			}
 		},
 	},
-	{ // 43: mapHas
-		Fn: func(args ...Object) Object {
-			if len(args) != 2 { return NULL }
-			m, ok := args[0].(*Map)
-			key, ok2 := args[1].(*String)
-			if !ok || !ok2 { return NULL }
-			_, exists := m.Pairs[key.Value]
-			if exists {
-				return TRUE
-			}
-			return FALSE
-		},
-	},
+	
 	{ // 44: charAt
 		Fn: func(args ...Object) Object {
 			if len(args) != 2 { return NULL }
@@ -966,6 +954,8 @@ var Builtins = []*Builtin{
 					var res Object
 					switch fn := comp.(type) {
 					case *CompiledFunction:
+						res = RunFunction(&Closure{Fn: fn}, *vmConstantsPtr, *vmGlobalsPtr, []Object{arr.Elements[i], arr.Elements[j]})
+					case *Closure:
 						res = RunFunction(fn, *vmConstantsPtr, *vmGlobalsPtr, []Object{arr.Elements[i], arr.Elements[j]})
 					case *Builtin:
 						res = fn.Fn(arr.Elements[i], arr.Elements[j])
@@ -1086,6 +1076,25 @@ var Builtins = []*Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 1 { return NULL }
 			return &String{Value: string(args[0].Type())}
+		},
+	},
+	{ // 98: toChar
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			switch arg := args[0].(type) {
+			case *Integer: return &Char{Value: rune(arg.Value)}
+			case *String: 
+				if len(arg.Value) > 0 { return &Char{Value: rune(arg.Value[0])} }
+				return &Char{Value: 0}
+			case *Char: return arg
+			default: return NULL
+			}
+		},
+	},
+	{ // 99: toString
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return NULL }
+			return &String{Value: args[0].Inspect()}
 		},
 	},
 }

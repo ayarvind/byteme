@@ -1,6 +1,7 @@
 package vm
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 
@@ -9,8 +10,8 @@ import (
 	"github.com/byteme/compiler/object"
 )
 
-const StackSize = 2048
-const MaxFrames = 1024
+const StackSize = 8192
+const MaxFrames = 2048
 const GlobalsSize = 65536
 
 type VM struct {
@@ -40,7 +41,13 @@ func init() {
 }
 
 func New(bytecode *compiler.Bytecode) *VM {
-	mainFn := &object.CompiledFunction{Instructions: bytecode.Instructions}
+	mainFn := &object.CompiledFunction{
+		Instructions: bytecode.Instructions,
+		SourceMap:    bytecode.SourceMap,
+		Filename:     bytecode.Filename,
+		Name:         "<main>",
+		NumLocals:    bytecode.NumLocals,
+	}
 	mainClosure := &object.Closure{Fn: mainFn}
 	mainFrame := NewFrame(mainClosure, 0)
 	frames := make([]*Frame, MaxFrames)
@@ -50,7 +57,7 @@ func New(bytecode *compiler.Bytecode) *VM {
 		constants:     bytecode.Constants,
 		globals:       make([]object.Object, GlobalsSize),
 		stack:         make([]object.Object, StackSize),
-		sp:            0,
+		sp:            bytecode.NumLocals,
 		frames:        frames,
 		framesIndex:   1,
 		catchHandlers: make([]*CatchHandler, 0),
@@ -79,9 +86,16 @@ func NewWithGlobalStore(constants []object.Object, globals []object.Object) *VM 
 // registerRunner sets the package-level object.RunFunction so that HTTP
 // (and other) builtins can call back into ByteMe compiled functions.
 func (vm *VM) registerRunner() {
-	object.RunFunction = func(fn *object.CompiledFunction, constants []object.Object, globals []object.Object, args []object.Object) object.Object {
+	object.RunFunction = func(closure *object.Closure, constants []object.Object, globals []object.Object, args []object.Object) object.Object {
 		child := NewWithGlobalStore(constants, globals)
-		closure := &object.Closure{Fn: fn}
+
+		// Push the function (closure) onto the stack first
+		child.push(closure)
+		
+		// Push arguments onto the stack
+		for _, arg := range args {
+			child.push(arg)
+		}
 
 		frame := NewFrame(closure, child.sp-len(args))
 		child.pushFrame(frame)
@@ -259,43 +273,68 @@ func (vm *VM) Run() error {
 			numArgs := int(ins[ip+1])
 			vm.currentFrame().ip += 1
 
-			fn := vm.stack[vm.sp-1-numArgs]
-			switch fn := fn.(type) {
+			fnObj := vm.stack[vm.sp-1-numArgs]
+			future := &object.Future{ValueChan: make(chan object.Object, 1)}
+
+			switch f := fnObj.(type) {
 			case *object.Builtin:
 				args := make([]object.Object, numArgs)
-				copy(args, vm.stack[vm.sp-numArgs : vm.sp])
+				copy(args, vm.stack[vm.sp-numArgs:vm.sp])
 				vm.sp = vm.sp - numArgs - 1
 				go func() {
-					fn.Fn(args...)
+					res := f.Fn(args...)
+					future.ValueChan <- res
 				}()
-				err := vm.push(object.NULL)
+				err := vm.push(future)
 				if err != nil { return err }
-			case *object.CompiledFunction:
-				if numArgs != fn.NumParameters {
-					return fmt.Errorf("wrong number of arguments: want=%d, got=%d", fn.NumParameters, numArgs)
+
+			case *object.Closure, *object.CompiledFunction:
+				var cl *object.Closure
+				var fn *object.CompiledFunction
+				if c, ok := f.(*object.Closure); ok {
+					cl = c
+					fn = c.Fn
+				} else {
+					fn = f.(*object.CompiledFunction)
+					cl = &object.Closure{Fn: fn}
 				}
+
+				if numArgs != fn.NumParameters {
+					return fmt.Errorf("wrong number of arguments for spawn: want=%d, got=%d", fn.NumParameters, numArgs)
+				}
+
 				// Spawn a new VM!
 				newVM := NewWithGlobalStore(vm.constants, vm.globals)
-
-				err := newVM.push(fn)
+				
+				// Push the closure onto the stack at index 0 (so that OpReturnValue can find it at basePointer-1)
+				err := newVM.push(cl)
 				if err != nil { return err }
+
+				// Push arguments onto the new VM's stack (starting at index 1)
 				for i := vm.sp - numArgs; i < vm.sp; i++ {
 					err := newVM.push(vm.stack[i])
 					if err != nil { return err }
 				}
 
-				vm.sp = vm.sp - numArgs - 1
-				err = vm.push(object.NULL)
-				if err != nil { return err }
-
+				vm.sp = vm.sp - numArgs - 1 // Pop args and function from original stack
+				
 				go func() {
-					frame := NewFrame(&object.Closure{Fn: fn}, newVM.sp-numArgs)
+					frame := NewFrame(cl, newVM.sp-numArgs)
 					newVM.pushFrame(frame)
 					newVM.sp = frame.basePointer + fn.NumLocals
-					newVM.Run()
+					err := newVM.Run()
+					if err != nil {
+						future.ValueChan <- &object.Error{Message: err.Error()}
+					} else {
+						future.ValueChan <- newVM.StackTop()
+					}
 				}()
+				
+				err = vm.push(future)
+				if err != nil { return err }
+
 			default:
-				return fmt.Errorf("spawning non-function")
+				return fmt.Errorf("spawning non-function: %T", fnObj)
 			}
 
 		case code.OpArray:
@@ -430,6 +469,32 @@ func (vm *VM) Run() error {
 		}
 	}
 	return nil
+}
+
+func (vm *VM) Trace() string {
+	var out bytes.Buffer
+	for i := vm.framesIndex - 1; i >= 0; i-- {
+		frame := vm.frames[i]
+		ip := frame.ip
+		fn := frame.cl.Fn
+		line := 0
+		if fn.SourceMap != nil {
+			// Find the nearest line number (largest offset <= ip)
+			bestOffset := -1
+			for offset, l := range fn.SourceMap {
+				if offset <= ip && offset > bestOffset {
+					bestOffset = offset
+					line = l
+				}
+			}
+		}
+		name := fn.Name
+		if name == "" { name = "<anonymous>" }
+		filename := fn.Filename
+		if filename == "" { filename = "<unknown>" }
+		out.WriteString(fmt.Sprintf("  at %s (%s:%d)\n", name, filename, line))
+	}
+	return out.String()
 }
 
 func (vm *VM) pushMapField(inst *object.Map, fieldName string) error {
@@ -679,7 +744,7 @@ func (vm *VM) executeBinaryArithmetic(op code.Opcode) error {
 		return vm.push(&object.Float{Value: result})
 	}
 
-	return fmt.Errorf("unsupported types for binary operation: %s and %s", left.Type(), right.Type())
+	return fmt.Errorf("unsupported types for binary operation: %s (%v) and %s (%v) [Op: %d]", left.Type(), left, right.Type(), right, op)
 }
 
 func (vm *VM) executeComparison(op code.Opcode) error {
