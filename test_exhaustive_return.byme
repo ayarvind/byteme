@@ -1,0 +1,9 @@
+fn greet(name:string) -> string {
+    if (name == "Alice") {
+        return "Hello Alice";
+    }
+}
+fn main() {
+    println(greet("Bob"));
+}
+main();

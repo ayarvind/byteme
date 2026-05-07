@@ -240,6 +240,34 @@ func (a *Analyzer) isAssignable(target, source string) bool {
 	return false
 }
 
+func (a *Analyzer) isTerminated(stmt ast.Statement) bool {
+	switch s := stmt.(type) {
+	case *ast.ReturnStatement, *ast.ThrowStatement:
+		return true
+	case *ast.BlockStatement:
+		var terminated bool
+		for _, stmt := range s.Statements {
+			if terminated {
+				a.error(stmt.GetToken(), "unreachable code detected")
+				break
+			}
+			a.Analyze(stmt)
+			if a.isTerminated(stmt) {
+				terminated = true
+			}
+		}
+		return terminated
+	case *ast.ExpressionStatement:
+		if ifExp, ok := s.Expression.(*ast.IfExpression); ok {
+			if ifExp.Alternative == nil {
+				return false
+			}
+			return a.isTerminated(ifExp.Consequence) && a.isTerminated(ifExp.Alternative)
+		}
+	}
+	return false
+}
+
 func (a *Analyzer) Analyze(node ast.Node) string {
 	switch n := node.(type) {
 	case *ast.Program:
@@ -519,6 +547,13 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 		a.currentReturnType = n.ReturnType
 		
 		a.Analyze(n.Body)
+
+		// Exhaustive return check
+		if n.ReturnType != "any" && n.ReturnType != "" && n.ReturnType != "void" {
+			if !a.isTerminated(n.Body) {
+				a.error(n.Token, "missing return at end of function: expected %s", n.ReturnType)
+			}
+		}
 		
 		a.currentReturnType = oldRet
 		a.env = oldEnv
