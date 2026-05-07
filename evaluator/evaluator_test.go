@@ -19,7 +19,7 @@ func testEval(input string) object.Object {
 	env := environment.NewEnvironment()
 	
 	// Analyze
-	a := analyzer.New(env)
+	a := analyzer.New(env, input, "test")
 	a.Analyze(program)
 	
 	// Optimize

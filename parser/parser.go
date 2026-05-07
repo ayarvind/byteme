@@ -407,13 +407,11 @@ func (p *Parser) parseLetStatement() *ast.LetStatement {
 		stmt.Type = p.curToken.Literal
 	}
 
-	if !p.expectPeek(token.ASSIGN) {
-		return nil
+	if p.peekTokenIs(token.ASSIGN) {
+		p.nextToken() // move to =
+		p.nextToken() // move to expression
+		stmt.Value = p.parseExpression(LOWEST)
 	}
-
-	p.nextToken()
-
-	stmt.Value = p.parseExpression(LOWEST)
 
 	if p.peekTokenIs(token.SEMICOLON) {
 		p.nextToken()

@@ -218,6 +218,28 @@ func (a *Analyzer) error(tok token.Token, format string, args ...interface{}) {
 	a.errors = append(a.errors, fullMsg)
 }
 
+func (a *Analyzer) isAssignable(target, source string) bool {
+	if target == "any" || source == "any" || target == source {
+		return true
+	}
+	// Implicit conversions
+	if target == "float" && source == "int" {
+		return true
+	}
+	// Interface implementation
+	methods, isInterface := a.interfaces[target]
+	if isInterface {
+		structMethods := a.structMethods[source]
+		for _, m := range methods {
+			if _, ok := structMethods[m.Name.Value]; !ok {
+				return false
+			}
+		}
+		return true
+	}
+	return false
+}
+
 func (a *Analyzer) Analyze(node ast.Node) string {
 	switch n := node.(type) {
 	case *ast.Program:
@@ -278,22 +300,16 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 		}
 
 	case *ast.LetStatement:
-		valType := a.Analyze(n.Value)
 		typeName := n.Type
 		if typeName == "" {
-			typeName = valType
-		} else if typeName != valType && typeName != "any" && valType != "any" {
-			// Check if typeName is an interface
-			methods, isInterface := a.interfaces[typeName]
-			if isInterface {
-				// Check if valType (struct) implements all methods
-				structMethods := a.structMethods[valType]
-				for _, m := range methods {
-					if _, ok := structMethods[m.Name.Value]; !ok {
-						a.error(n.Token, "type %s does not implement interface %s: missing method %s", valType, typeName, m.Name.Value)
-					}
-				}
-			} else {
+			if n.Value == nil {
+				a.error(n.Token, "variable declaration without type requires immediate initialization")
+				return "any"
+			}
+			typeName = a.Analyze(n.Value)
+		} else if n.Value != nil {
+			valType := a.Analyze(n.Value)
+			if !a.isAssignable(typeName, valType) {
 				a.error(n.Token, "type mismatch: cannot assign %s to %s", valType, typeName)
 			}
 		}
@@ -308,8 +324,8 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 		typeName := n.Type
 		if typeName == "" {
 			typeName = valType
-		} else if typeName != valType && valType != "any" && typeName != "any" {
-			a.error(n.Token, "type mismatch: cannot assign %s to %s", valType, typeName)
+		} else if !a.isAssignable(typeName, valType) {
+			a.error(n.Token, "type mismatch: cannot assign %s to constant of type %s", valType, typeName)
 		}
 		err := a.env.Set(n.Name.Value, typeName, environment.PUBLIC, true)
 		if err != nil {
@@ -377,8 +393,17 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 		if n.Operator == "=" {
 			leftType := a.Analyze(n.Left)
 			rightType := a.Analyze(n.Right)
-			if leftType != "any" && rightType != "any" && leftType != rightType {
+			if !a.isAssignable(leftType, rightType) {
 				a.error(n.Token, "type mismatch in assignment: cannot assign %s to %s", rightType, leftType)
+			}
+
+			// Check for constant reassignment
+			if ident, ok := n.Left.(*ast.Identifier); ok {
+				if sym, ok := a.env.Get(ident.Value); ok {
+					if sym.IsConst {
+						a.error(n.Token, "cannot reassign to constant variable: %s", ident.Value)
+					}
+				}
 			}
 			return rightType
 		}
@@ -625,14 +650,6 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 			}
 		}
 		return retType
-
-	case *ast.AssignmentStatement:
-		leftType := a.Analyze(n.Left)
-		rightType := a.Analyze(n.Value)
-		if leftType != "any" && rightType != "any" && leftType != rightType {
-			a.error(n.Token, "type mismatch in assignment: cannot assign %s to %s", rightType, leftType)
-		}
-		return rightType
 
 	case *ast.ThrowStatement:
 		a.Analyze(n.Value)

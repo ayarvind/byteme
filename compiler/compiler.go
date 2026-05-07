@@ -399,9 +399,13 @@ func (c *Compiler) Compile(node ast.Node) error {
 		return nil
 
 	case *ast.LetStatement:
-		err := c.Compile(n.Value)
-		if err != nil {
-			return err
+		if n.Value != nil {
+			err := c.Compile(n.Value)
+			if err != nil {
+				return err
+			}
+		} else {
+			c.emit(code.OpNull)
 		}
 		symbol := c.symbolTable.Define(n.Name.Value)
 		if symbol.Scope == GlobalScope {
@@ -736,9 +740,13 @@ func (c *Compiler) Compile(node ast.Node) error {
 			switch s := stmt.(type) {
 			case *ast.LetStatement:
 				compoundName := nsName + "." + s.Name.Value
-				err := c.Compile(s.Value)
-				if err != nil {
-					return err
+				if s.Value != nil {
+					err := c.Compile(s.Value)
+					if err != nil {
+						return err
+					}
+				} else {
+					c.emit(code.OpNull)
 				}
 
 				sym, _ := c.symbolTable.Resolve(compoundName)

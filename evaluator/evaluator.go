@@ -341,7 +341,10 @@ func Eval(node ast.Node, env *environment.Environment) object.Object {
 		return &object.ReturnValue{Value: val}
 
 	case *ast.LetStatement:
-		val := Eval(n.Value, env)
+		var val object.Object = NULL
+		if n.Value != nil {
+			val = Eval(n.Value, env)
+		}
 		env.SetVal(n.Name.Value, val)
 		return val
 

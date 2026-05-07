@@ -5,6 +5,7 @@ import (
 	"github.com/byteme/compiler/lexer"
 	"github.com/byteme/compiler/parser"
 	"github.com/byteme/compiler/environment"
+	"strings"
 )
 
 func TestTypeMismatch(t *testing.T) {
@@ -17,16 +18,16 @@ let y: string = x;
 	program := p.ParseProgram()
 	
 	env := environment.NewEnvironment()
-	a := New(env)
+	a := New(env, input, "test")
 	a.Analyze(program)
 
 	if len(a.Errors()) == 0 {
 		t.Errorf("expected type mismatch error, got none")
 	}
 	
-	expected := "[3:1] type mismatch: cannot assign int to string"
-	if a.Errors()[0] != expected {
-		t.Errorf("wrong error message. expected=%q, got=%q", expected, a.Errors()[0])
+	expected := "type mismatch: cannot assign int to string"
+	if !strings.Contains(a.Errors()[0], expected) {
+		t.Errorf("wrong error message. expected to contain %q, got=%q", expected, a.Errors()[0])
 	}
 }
 
@@ -39,16 +40,16 @@ let x: int = y + 5;
 	program := p.ParseProgram()
 	
 	env := environment.NewEnvironment()
-	a := New(env)
+	a := New(env, input, "test")
 	a.Analyze(program)
 
 	if len(a.Errors()) == 0 {
 		t.Errorf("expected undefined variable error, got none")
 	}
 	
-	expected := "[2:14] undefined variable: y"
-	if a.Errors()[0] != expected {
-		t.Errorf("wrong error message. expected=%q, got=%q", expected, a.Errors()[0])
+	expected := "undefined variable: y"
+	if !strings.Contains(a.Errors()[0], expected) {
+		t.Errorf("wrong error message. expected to contain %q, got=%q", expected, a.Errors()[0])
 	}
 }
 
@@ -64,7 +65,7 @@ let radius: float = pi;
 	program := p.ParseProgram()
 	
 	env := environment.NewEnvironment()
-	a := New(env)
+	a := New(env, input, "test")
 	a.Analyze(program)
 
 	// 'pi' is inside Math namespace, so it should be undefined in global scope
