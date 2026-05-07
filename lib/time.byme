@@ -1,31 +1,29 @@
 // ByteMe Standard Library: Time
 // Provides date and time manipulation utilities.
 
-public namespace Time {
-    // Returns current Unix timestamp
-    public fn now() {
-        return timeNow();
-    }
-
-    // Sleeps for n seconds
-    public fn sleep(seconds) {
-        timeSleep(seconds);
-    }
-
-    // Formats a Unix timestamp using a Go-style layout string
-    public fn format(timestamp, layout) {
-        return timeFormat(timestamp, layout);
-    }
-
-    // Parses a time string into a Unix timestamp
-    public fn parse(layout, value) {
-        return timeParse(layout, value);
-    }
-
-    // Common Layouts
-    public const ANSIC       = "Mon Jan _2 15:04:05 2006";
-    public const RFC822      = "02 Jan 06 15:04 MST";
-    public const RFC3339     = "2006-01-02T15:04:05Z07:00";
-    public const DATE_ONLY   = "2006-01-02";
-    public const TIME_ONLY   = "15:04:05";
+// Returns current Unix timestamp
+fn now() {
+    return timeNow();
 }
+
+// Sleeps for n seconds
+fn sleep(seconds) {
+    timeSleep(seconds);
+}
+
+// Formats a Unix timestamp using a Go-style layout string
+fn format(timestamp, layout) {
+    return timeFormat(timestamp, layout);
+}
+
+// Parses a time string into a Unix timestamp
+fn parse(layout, value) {
+    return timeParse(layout, value);
+}
+
+// Common Layouts
+const ANSIC       = "Mon Jan _2 15:04:05 2006";
+const RFC822      = "02 Jan 06 15:04 MST";
+const RFC3339     = "2006-01-02T15:04:05Z07:00";
+const DATE_ONLY   = "2006-01-02";
+const TIME_ONLY   = "15:04:05";

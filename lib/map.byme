@@ -1,45 +1,42 @@
 // ByteMe Standard Library: Map
 // Provides an OOP-style wrapper for the built-in map type.
 
-public namespace Map {
+struct MapWrapper {
+    data: any
+}
 
-    public struct MapWrapper {
-        data: any
-    }
+fn mapNew() {
+    return MapWrapper(map());
+}
 
-    public fn new() {
-        return MapWrapper(map());
-    }
+fn mapPut(m: MapWrapper, key, val) {
+    mapSet(m.data, key, val);
+}
 
-    public fn put(m: MapWrapper, key, val) {
-        mapSet(m.data, key, val);
-    }
+fn mapGet(m: MapWrapper, key) {
+    return mapGet(m.data, key);
+}
 
-    public fn get(m: MapWrapper, key) {
-        return mapGet(m.data, key);
-    }
+fn mapHas(m: MapWrapper, key) {
+    return mapHas(m.data, key);
+}
 
-    public fn has(m: MapWrapper, key) {
-        return mapHas(m.data, key);
-    }
+fn mapRemove(m: MapWrapper, key) {
+    mapDelete(m.data, key);
+}
 
-    public fn remove(m: MapWrapper, key) {
-        mapDelete(m.data, key);
-    }
+fn mapKeys(m: MapWrapper) {
+    return mapKeys(m.data);
+}
 
-    public fn keys(m: MapWrapper) {
-        return mapKeys(m.data);
-    }
+fn mapValues(m: MapWrapper) {
+    return mapValues(m.data);
+}
 
-    public fn values(m: MapWrapper) {
-        return mapValues(m.data);
-    }
+fn mapSize(m: MapWrapper) {
+    return len(mapKeys(m.data));
+}
 
-    public fn size(m: MapWrapper) {
-        return len(mapKeys(m.data));
-    }
-
-    public fn clear(m: MapWrapper) {
-        m.data = map();
-    }
+fn mapClear(m: MapWrapper) {
+    m.data = map();
 }

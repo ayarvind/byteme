@@ -1,0 +1,137 @@
+// Test file exercising all standard library components in a flat scope
+import "lib/math.byme"
+import "lib/string.byme"
+import "lib/time.byme"
+import "lib/collections.byme"
+import "lib/algorithm.byme"
+import "lib/map.byme"
+import "lib/set.byme"
+import "lib/console.byme"
+import "lib/web.byme"
+
+fn testMath() {
+    println(">>> Testing Math Library");
+    println("PI:", PI);
+    println("abs(-10):", abs(-10));
+    println("sqrt(16):", sqrt(16.0));
+    println("max(10, 20):", max(10, 20));
+    println("min(5, 2):", min(5, 2));
+    println("sin(PI/2):", sin(PI / 2.0));
+}
+
+fn testString() {
+    println("\n>>> Testing String Library");
+    let s = "  ByteMe Language  ";
+    println("Original:", "'" + s + "'");
+    println("Lower:", toLower(s));
+    println("Upper:", toUpper(s));
+    println("Trimmed:", "'" + trimSpace(s) + "'");
+    
+    let parts = split("a,b,c", ",");
+    println("Split 'a,b,c':", parts);
+    println("Joined:", join(parts, "|"));
+    
+    println("Contains 'Byte':", contains(s, "Byte"));
+    println("Substring(2, 8):", substring(s, 2, 8));
+}
+
+fn testCollections() {
+    println("\n>>> Testing Collections Library");
+    
+    // List
+    let l = listNew();
+    listAdd(l, "one");
+    listAdd(l, "two");
+    println("List Size:", listSize(l));
+    println("List Get(1):", listGet(l, 1));
+    
+    // Stack
+    let st = stackNew();
+    stackPush(st, 10);
+    stackPush(st, 20);
+    println("Stack Pop:", stackPop(st));
+    println("Stack Peek:", stackPeek(st));
+    
+    // Queue
+    let q = queueNew();
+    queueEnqueue(q, "first");
+    queueEnqueue(q, "second");
+    println("Queue Dequeue:", queueDequeue(q));
+    println("Queue Peek:", queuePeek(q));
+}
+
+fn testAlgorithm() {
+    println("\n>>> Testing Algorithm Library");
+    let arr = [5, 2, 8, 1, 9];
+    println("Original Array:", arr);
+    
+    let sortedArr = sorted(arr, null);
+    println("Sorted Array:", sortedArr);
+    
+    let doubled = algoMap(arr, fn(x) { return x * 2; });
+    println("Mapped (x*2):", doubled);
+    
+    let evens = algoFilter(arr, fn(x) { return x % 2 == 0; });
+    println("Filtered (evens):", evens);
+    
+    let sum = algoReduce(arr, fn(acc, x) { return acc + x; }, 0);
+    println("Reduced (sum):", sum);
+}
+
+fn testMapAndSet() {
+    println("\n>>> Testing Map and Set Libraries");
+    
+    // Map
+    let m = mapNew();
+    mapPut(m, "key1", "val1");
+    mapPut(m, "key2", "val2");
+    println("Map Get 'key1':", mapGet(m, "key1"));
+    println("Map Keys:", mapKeys(m));
+    
+    // Set
+    let s1 = setNew();
+    setAdd(s1, 1);
+    setAdd(s1, 2);
+    setAdd(s1, 3);
+    
+    let s2 = setNew();
+    setAdd(s2, 3);
+    setAdd(s2, 4);
+    
+    println("Set1:", setToArray(s1));
+    println("Set2:", setToArray(s2));
+    
+    let u = setUnion(s1, s2);
+    println("Union:", setToArray(u));
+    
+    let i = setIntersect(s1, s2);
+    println("Intersection:", setToArray(i));
+}
+
+fn testTimeAndWeb() {
+    println("\n>>> Testing Time and Web Libraries");
+    println("Current Timestamp:", now());
+    println("Formatted Time:", format(now(), RFC3339));
+    
+    let tpl = "Hello, {{ name }}! Welcome to {{ lang }}.";
+    let ctx = map();
+    mapSet(ctx, "name", "User");
+    mapSet(ctx, "lang", "ByteMe");
+    
+    println("Web Render:", webRender(tpl, ctx));
+}
+
+fn main() {
+    println("Starting Standard Library Comprehensive Test...");
+    
+    testMath();
+    testString();
+    testCollections();
+    testAlgorithm();
+    testMapAndSet();
+    testTimeAndWeb();
+    
+    println("\nStandard Library Test Complete!");
+}
+
+main();

@@ -3,69 +3,68 @@
 
 import "lib/string.byme"
 
-public namespace Web {
-
-    // Simple template engine that replaces {{ key }} with value from context
-    public fn render(template, context) {
-        let output = template;
-        let keys = mapKeys(context);
-        let i = 0;
-        while (i < len(keys)) {
-            let key = keys[i];
-            let val = mapGet(context, key);
-            let placeholder = "{{" + key + "}}";
-            
-            // Convert value to string if it's not one
-            let strVal = "";
-            if (typeof(val) == "STRING") {
-                strVal = val;
-            } else if (typeof(val) == "INTEGER") {
+// Simple template engine that replaces {{ key }} with value from context
+fn webRender(template, context) {
+    let output = template;
+    let keys = mapKeys(context);
+    let i = 0;
+    while (i < len(keys)) {
+        let key = keys[i];
+        let val = mapGet(context, key);
+        let placeholder = "{{" + key + "}}";
+        
+        let strVal = "";
+        if (typeof(val) == "STRING") {
+            strVal = val;
+        } else {
+            if (typeof(val) == "INTEGER") {
                 strVal = itoa(val);
-            } else if (typeof(val) == "FLOAT") {
-                strVal = ftoa(val);
             } else {
-                strVal = jsonStringify(val);
+                if (typeof(val) == "FLOAT") {
+                    strVal = ftoa(val);
+                } else {
+                    strVal = jsonStringify(val);
+                }
             }
-            
-            output = String.replaceAll(output, placeholder, strVal);
-            i = i + 1;
         }
-        return output;
+        
+        output = replaceAll(output, placeholder, strVal);
+        i = i + 1;
     }
+    return output;
+}
 
-    // Helpers for common responses 
-    public fn json(data) {
-        return httpResponse(200, jsonStringify(data), "application/json");
-    }
+fn webJson(data) {
+    return httpResponse(200, jsonStringify(data), "application/json");
+}
 
-    public fn html(body) {
-        return httpResponse(200, body, "text/html");
-    }
+fn webHtml(body) {
+    return httpResponse(200, body, "text/html");
+}
 
-    public fn redirect(url) {
-        let res = map();
-        mapSet(res, "status", 302);
-        mapSet(res, "body", "");
-        let headers = map();
-        mapSet(headers, "Location", url);
-        mapSet(res, "headers", headers);
-        return res;
-    }
+fn webRedirect(url) {
+    let res = map();
+    mapSet(res, "status", 302);
+    mapSet(res, "body", "");
+    let headers = map();
+    mapSet(headers, "Location", url);
+    mapSet(res, "headers", headers);
+    return res;
+}
 
-    // Router helper
-    public struct App {
-        port: int
-    }
+// Router helper
+struct App {
+    port: int
+}
 
-    public fn new(port) {
-        return App(port);
-    }
+fn webNewApp(port) {
+    return App(port);
+}
 
-    public fn route(app, path, handler) {
-        httpHandle(path, handler);
-    }
+fn webRoute(app, path, handler) {
+    httpHandle(path, handler);
+}
 
-    public fn start(app) {
-        httpServe(app.port);
-    }
+fn webStart(app) {
+    httpServe(app.port);
 }

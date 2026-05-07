@@ -1,71 +1,68 @@
 // ByteMe Standard Library: Set
 // Provides a Set data structure for unique value storage.
 
-public namespace Set{
+struct Set {
+    data: any
+}
 
-    public struct Set {
-        data: any
-    }
+fn setNew() {
+    return Set(map());
+}
 
-    public fn new() {
-        return Set(map());
-    }
+fn setAdd(s: Set, val) {
+    mapSet(s.data, val, true);
+}
 
-    public fn add(s: Set, val) {
-        mapSet(s.data, val, true);
-    }
+fn setRemove(s: Set, val) {
+    mapDelete(s.data, val);
+}
 
-    public fn remove(s: Set, val) {
-        mapDelete(s.data, val);
-    }
+fn setHas(s: Set, val) {
+    return mapHas(s.data, val);
+}
 
-    public fn has(s: Set, val) {
-        return mapHas(s.data, val);
-    }
+fn setSize(s: Set) {
+    return len(mapKeys(s.data));
+}
 
-    public fn size(s: Set) {
-        return len(mapKeys(s.data));
-    }
+fn setClear(s: Set) {
+    s.data = map();
+}
 
-    public fn clear(s: Set) {
-        s.data = map();
-    }
+fn setToArray(s: Set) {
+    return mapKeys(s.data);
+}
 
-    public fn toArray(s: Set) {
-        return mapKeys(s.data);
-    }
+// Mathematical Set Operations
 
-    // Mathematical Set Operations
+fn setUnion(a: Set, b: Set) {
+    let res = setNew();
+    let keysA = setToArray(a);
+    let keysB = setToArray(b);
     
-    public fn union(a: Set, b: Set) {
-        let res = new();
-        let keysA = toArray(a);
-        let keysB = toArray(b);
-        
-        let i = 0;
-        while (i < len(keysA)) {
-            add(res, keysA[i]);
-            i = i + 1;
-        }
-        
-        i = 0;
-        while (i < len(keysB)) {
-            add(res, keysB[i]);
-            i = i + 1;
-        }
-        return res;
+    let i = 0;
+    while (i < len(keysA)) {
+        setAdd(res, keysA[i]);
+        i = i + 1;
     }
+    
+    i = 0;
+    while (i < len(keysB)) {
+        setAdd(res, keysB[i]);
+        i = i + 1;
+    }
+    return res;
+}
 
-    public fn intersect(a: Set, b: Set) {
-        let res = new();
-        let keysA = toArray(a);
-        let i = 0;
-        while (i < len(keysA)) {
-            if (has(b, keysA[i])) {
-                add(res, keysA[i]);
-            }
-            i = i + 1;
+fn setIntersect(a: Set, b: Set) {
+    let res = setNew();
+    let keysA = setToArray(a);
+    let i = 0;
+    while (i < len(keysA)) {
+        if (setHas(b, keysA[i])) {
+            setAdd(res, keysA[i]);
         }
-        return res;
+        i = i + 1;
     }
+    return res;
 }

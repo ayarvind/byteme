@@ -1,40 +1,36 @@
 // ByteMe Standard Library: Console
 // Provides functions for console I/O, similar to Python's input() and C++'s cin/cout.
 
-public namespace Console {
-    // Prints message to console without a newline
-    public fn print(msg) {
-        // Built-in println always adds a newline, so we might need a native print
-        // For now, we'll use a hack if we don't have a native print
-        // but wait, I can add a native print built-in too.
-        // Actually, ioReadInput(prompt) can be used as a print if we don't read.
-    }
+// Prints message to console without a newline
+fn print(msg) {
+    // Built-in println always adds a newline, so we might need a native print
+    // For now, we'll use a hack if we don't have a native print
+}
 
-    // Prints message to console with a newline
-    public fn println(msg) {
-        println(msg);
-    }
+// Prints message to console with a newline
+fn println(msg) {
+    println(msg);
+}
 
-    // Reads a line of input from the console with an optional prompt
-    public fn input(prompt) {
-        return ioReadInput(prompt);
-    }
+// Reads a line of input from the console with an optional prompt
+fn input(prompt) {
+    return ioReadInput(prompt);
+}
 
-    // Reads a line of input and attempts to convert it to an integer
-    public fn inputInt(prompt) {
-        let s = ioReadInput(prompt);
-        return toInt(s);
-    }
+// Reads a line of input and attempts to convert it to an integer
+fn inputInt(prompt) {
+    let s = ioReadInput(prompt);
+    return toInt(s);
+}
 
-    // Reads a line of input and attempts to convert it to a float
-    public fn inputFloat(prompt) {
-        let s = ioReadInput(prompt);
-        return toFloat(s);
-    }
+// Reads a line of input and attempts to convert it to a float
+fn inputFloat(prompt) {
+    let s = ioReadInput(prompt);
+    return toFloat(s);
+}
 
-    // Clears the console screen (platform dependent, but usually works on modern terminals)
-    public fn clear() {
-        // ANSI escape code to clear screen
-        println("\033[H\033[2J");
-    }
+// Clears the console screen (platform dependent, but usually works on modern terminals)
+fn clear() {
+    // ANSI escape code to clear screen
+    println("\033[H\033[2J");
 }

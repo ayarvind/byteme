@@ -1,82 +1,79 @@
 // ByteMe Standard Library: Collections
 // Provides data structures like List (Vector), Stack, and Queue.
 
-public namespace Collections {
+// ── List (Dynamic Array / Vector) ──────────────────────────────────────
+struct List {
+    items: any
+}
 
-    // ── List (Dynamic Array / Vector) ──────────────────────────────────────
-    public struct List {
-        items: any
-    }
+fn listNew() {
+    return List([]);
+}
 
-    public fn newList() {
-        return List([]);
-    }
+fn listAdd(list: List, item) {
+    arrayPush(list.items, item);
+}
 
-    public fn add(list: List, item) {
-        arrayPush(list.items, item);
-    }
+fn listGet(list: List, index) {
+    return list.items[index];
+}
 
-    public fn get(list: List, index) {
-        return list.items[index];
-    }
+fn listSize(list: List) {
+    return len(list.items);
+}
 
-    public fn size(list: List) {
-        return len(list.items);
-    }
+fn listClear(list: List) {
+    list.items = [];
+}
 
-    public fn clear(list: List) {
-        list.items = [];
-    }
+// ── Stack (LIFO) ────────────────────────────────────────────────────────
+struct Stack {
+    items: any
+}
 
-    // ── Stack (LIFO) ────────────────────────────────────────────────────────
-    public struct Stack {
-        items: any
-    }
+fn stackNew() {
+    return Stack([]);
+}
 
-    public fn newStack() {
-        return Stack([]);
-    }
+fn stackPush(s: Stack, item) {
+    arrayPush(s.items, item);
+}
 
-    public fn push(s: Stack, item) {
-        arrayPush(s.items, item);
-    }
+fn stackPop(s: Stack) {
+    return arrayPop(s.items);
+}
 
-    public fn pop(s: Stack) {
-        return arrayPop(s.items);
-    }
+fn stackPeek(s: Stack) {
+    let n = len(s.items);
+    if (n == 0) { return null; }
+    return s.items[n-1];
+}
 
-    public fn peek(s: Stack) {
-        let n = len(s.items);
-        if (n == 0) { return null; }
-        return s.items[n-1];
-    }
+fn stackIsEmpty(s: Stack) {
+    return len(s.items) == 0;
+}
 
-    public fn isEmpty(s: Stack) {
-        return len(s.items) == 0;
-    }
+// ── Queue (FIFO) ────────────────────────────────────────────────────────
+struct Queue {
+    items: any
+}
 
-    // ── Queue (FIFO) ────────────────────────────────────────────────────────
-    public struct Queue {
-        items: any
-    }
+fn queueNew() {
+    return Queue([]);
+}
 
-    public fn newQueue() {
-        return Queue([]);
-    }
+fn queueEnqueue(q: Queue, item) {
+    arrayPush(q.items, item);
+}
 
-    public fn enqueue(q: Queue, item) {
-        arrayPush(q.items, item);
-    }
+fn queueDequeue(q: Queue) {
+    if (len(q.items) == 0) { return null; }
+    let item = q.items[0];
+    q.items = arraySlice(q.items, 1, len(q.items));
+    return item;
+}
 
-    public fn dequeue(q: Queue) {
-        if (len(q.items) == 0) { return null; }
-        let item = q.items[0];
-        q.items = arraySlice(q.items, 1, len(q.items));
-        return item;
-    }
-
-    public fn peekQueue(q: Queue) {
-        if (len(q.items) == 0) { return null; }
-        return q.items[0];
-    }
+fn queuePeek(q: Queue) {
+    if (len(q.items) == 0) { return null; }
+    return q.items[0];
 }
