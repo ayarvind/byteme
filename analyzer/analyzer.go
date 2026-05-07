@@ -9,6 +9,7 @@ import (
 	"github.com/byteme/compiler/lexer"
 	"github.com/byteme/compiler/parser"
 	"github.com/byteme/compiler/token"
+	"strings"
 )
  
 type FunctionSignature struct {
@@ -19,14 +20,17 @@ type FunctionSignature struct {
 type Analyzer struct {
 	env               *environment.Environment
 	errors            []string
-	structMethods     map[string]map[string]bool
+	structMethods     map[string]map[string]FunctionSignature
 	interfaces        map[string][]*ast.MethodSignature
 	currentReturnType string
 	funcSignatures    map[string]FunctionSignature
 	structFields      map[string]map[string]string
+	source            string
+	filename          string
+	lines             []string
 }
 
-func New(env *environment.Environment) *Analyzer {
+func New(env *environment.Environment, source string, filename string) *Analyzer {
 	// Register basic types as symbols
 	env.Set("int", "type", environment.PUBLIC, true)
 	env.Set("float", "type", environment.PUBLIC, true)
@@ -160,11 +164,14 @@ func New(env *environment.Environment) *Analyzer {
 	a := &Analyzer{
 		env:               env,
 		errors:            []string{},
-		structMethods:     make(map[string]map[string]bool),
+		structMethods:     make(map[string]map[string]FunctionSignature),
 		interfaces:        make(map[string][]*ast.MethodSignature),
 		currentReturnType: "",
 		funcSignatures:    make(map[string]FunctionSignature),
 		structFields:      make(map[string]map[string]string),
+		source:            source,
+		filename:          filename,
+		lines:             strings.Split(source, "\n"),
 	}
 	
 	// Register built-in signatures
@@ -185,7 +192,30 @@ func (a *Analyzer) Errors() []string {
 
 func (a *Analyzer) error(tok token.Token, format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
-	a.errors = append(a.errors, fmt.Sprintf("[%d:%d] %s", tok.Line, tok.Column, msg))
+	
+	loc := fmt.Sprintf("%s:%d:%d", a.filename, tok.Line, tok.Column)
+	fullMsg := fmt.Sprintf("[%s] %s", loc, msg)
+
+	// Add code snippet
+	if tok.Line > 0 && tok.Line <= len(a.lines) {
+		line := a.lines[tok.Line-1]
+		
+		// Create highlight pointer
+		pointer := ""
+		for i := 1; i < tok.Column; i++ {
+			if i-1 < len(line) && line[i-1] == '\t' {
+				pointer += "\t"
+			} else {
+				pointer += " "
+			}
+		}
+		pointer += "^"
+
+		snippet := fmt.Sprintf("\n  %d | %s\n      | %s", tok.Line, line, pointer)
+		fullMsg += snippet
+	}
+
+	a.errors = append(a.errors, fullMsg)
 }
 
 func (a *Analyzer) Analyze(node ast.Node) string {
@@ -259,7 +289,7 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 				// Check if valType (struct) implements all methods
 				structMethods := a.structMethods[valType]
 				for _, m := range methods {
-					if !structMethods[m.Name.Value] {
+					if _, ok := structMethods[m.Name.Value]; !ok {
 						a.error(n.Token, "type %s does not implement interface %s: missing method %s", valType, typeName, m.Name.Value)
 					}
 				}
@@ -317,7 +347,15 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 		if n.Operator == "." {
 			leftType := a.Analyze(n.Left)
 			
-			// Check if it's a struct field access
+			// Check if it's a struct field or method access
+			if methods, ok := a.structMethods[leftType]; ok {
+				if rightIdent, ok := n.Right.(*ast.Identifier); ok {
+					if _, ok := methods[rightIdent.Value]; ok {
+						return "function" // Or a specialized type like "method"
+					}
+				}
+			}
+
 			if fields, ok := a.structFields[leftType]; ok {
 				if rightIdent, ok := n.Right.(*ast.Identifier); ok {
 					if fieldType, ok := fields[rightIdent.Value]; ok {
@@ -435,9 +473,13 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 			funcEnv.Set(n.Receiver.Name.Value, n.Receiver.Type, environment.PUBLIC, false)
 			// Track that this type has this method
 			if a.structMethods[n.Receiver.Type] == nil {
-				a.structMethods[n.Receiver.Type] = make(map[string]bool)
+				a.structMethods[n.Receiver.Type] = make(map[string]FunctionSignature)
 			}
-			a.structMethods[n.Receiver.Type][n.Name.Value] = true
+			sig := FunctionSignature{Return: n.ReturnType}
+			for _, p := range n.Parameters {
+				sig.Params = append(sig.Params, p.Type)
+			}
+			a.structMethods[n.Receiver.Type][n.Name.Value] = sig
 		}
 
 		for _, p := range n.Parameters {
@@ -503,24 +545,61 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 			if sig, ok := a.funcSignatures[ident.Value]; ok {
 				if len(n.Arguments) != len(sig.Params) && ident.Value != "println" {
 					a.error(n.Token, "wrong number of arguments for %s: expected %d, got %d", ident.Value, len(sig.Params), len(n.Arguments))
+				} else {
+					// Check argument types
+					for i, arg := range n.Arguments {
+						if i >= len(sig.Params) { break }
+						argType := a.Analyze(arg)
+						expectedType := sig.Params[i]
+						if expectedType != "any" && argType != "any" && expectedType != argType {
+							a.error(n.Token, "type mismatch for argument %d of %s: expected %s, got %s", i+1, ident.Value, expectedType, argType)
+						}
+					}
 				}
-				// Type checking for arguments could be added here
 			}
 
 			// Built-in return type deduction
 			switch ident.Value {
-			case "map": return "map"
-			case "array": return "array"
-			case "len", "arrayLen", "toInt", "strIndex", "strLastIndex", "strCount": return "int"
-			case "toFloat": return "float"
-			case "toString", "typeof", "strToLower", "strToUpper", "strTrim", "strTrimSpace", "strJoin", "strReplace", "strRepeat", "strTrimLeft", "strTrimRight", "strReverse", "jsonStringify": return "string"
-			case "toChar", "charAt": return "char"
-			case "strContains", "strHasPrefix", "strHasSuffix", "strIsAlpha", "strIsDigit", "strIsSpace", "mapHas", "osExists", "osIsdir", "osIsfile", "regexMatch": return "bool"
+			case "map":
+				return "map"
+			case "array":
+				return "array"
+			case "len", "arrayLen", "toInt", "strIndex", "strLastIndex", "strCount":
+				return "int"
+			case "toFloat":
+				return "float"
+			case "toString", "typeof", "strToLower", "strToUpper", "strTrim", "strTrimSpace", "strJoin", "strReplace", "strRepeat", "strTrimLeft", "strTrimRight", "strReverse", "jsonStringify":
+				return "string"
+			case "toChar", "charAt":
+				return "char"
+			case "strContains", "strHasPrefix", "strHasSuffix", "strIsAlpha", "strIsDigit", "strIsSpace", "mapHas", "osExists", "osIsdir", "osIsfile", "regexMatch":
+				return "bool"
 			}
 
 			sym, ok := a.env.Get(ident.Value)
 			if ok && sym.Type == "type" {
 				return ident.Value
+			}
+		} else if dot, ok := n.Function.(*ast.InfixExpression); ok && dot.Operator == "." {
+			// Method call: u.greet()
+			leftType := a.Analyze(dot.Left)
+			if methods, ok := a.structMethods[leftType]; ok {
+				if rightIdent, ok := dot.Right.(*ast.Identifier); ok {
+					if sig, ok := methods[rightIdent.Value]; ok {
+						if len(n.Arguments) != len(sig.Params) {
+							a.error(n.Token, "wrong number of arguments for method %s: expected %d, got %d", rightIdent.Value, len(sig.Params), len(n.Arguments))
+						} else {
+							for i, arg := range n.Arguments {
+								argType := a.Analyze(arg)
+								expectedType := sig.Params[i]
+								if expectedType != "any" && argType != "any" && expectedType != argType {
+									a.error(n.Token, "type mismatch for argument %d of method %s: expected %s, got %s", i+1, rightIdent.Value, expectedType, argType)
+								}
+							}
+						}
+						return sig.Return
+					}
+				}
 			}
 		}
 		return "any"
@@ -599,7 +678,15 @@ func (a *Analyzer) preScan(stmt ast.Statement) {
 				for _, p := range expr.Parameters {
 					sig.Params = append(sig.Params, p.Type)
 				}
-				a.funcSignatures[expr.Name.Value] = sig
+
+				if expr.Receiver != nil {
+					if a.structMethods[expr.Receiver.Type] == nil {
+						a.structMethods[expr.Receiver.Type] = make(map[string]FunctionSignature)
+					}
+					a.structMethods[expr.Receiver.Type][expr.Name.Value] = sig
+				} else {
+					a.funcSignatures[expr.Name.Value] = sig
+				}
 			}
 		case *ast.StructLiteral:
 			a.env.Set(expr.Name.Value, "type", environment.PUBLIC, true)

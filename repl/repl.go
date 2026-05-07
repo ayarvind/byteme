@@ -17,7 +17,6 @@ const PROMPT = "byteme >> "
 func Start(in io.Reader, out io.Writer) {
 	scanner := bufio.NewScanner(in)
 	env := environment.NewEnvironment()
-	a := analyzer.New(env)
 
 	for {
 		fmt.Fprint(out, PROMPT)
@@ -41,6 +40,7 @@ func Start(in io.Reader, out io.Writer) {
 		}
 
 		// Analyze
+		a := analyzer.New(env, line, "repl")
 		a.Analyze(program)
 		if len(a.Errors()) != 0 {
 			printParserErrors(out, a.Errors())

@@ -61,7 +61,7 @@ func main() {
 
 	// 3. Semantic Analysis
 	env := environment.NewEnvironment()
-	a := analyzer.New(env)
+	a := analyzer.New(env, string(input), filename)
 	a.Analyze(program)
 	if len(a.Errors()) != 0 {
 		printErrors("Analyzer", a.Errors())
