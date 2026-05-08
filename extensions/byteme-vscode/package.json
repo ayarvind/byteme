@@ -1,0 +1,61 @@
+{
+    "name": "byteme-vscode",
+    "displayName": "ByteMe Language Support",
+    "description": "Syntax highlighting and linting for the ByteMe programming language.",
+    "version": "0.1.0",
+    "publisher": "byteme",
+    "engines": {
+        "vscode": "^1.60.0"
+    },
+    "categories": [
+        "Programming Languages"
+    ],
+    "main": "./extension.js",
+    "activationEvents": [
+        "onLanguage:byteme"
+    ],
+    "contributes": {
+        "languages": [
+            {
+                "id": "byteme",
+                "aliases": [
+                    "ByteMe",
+                    "byteme"
+                ],
+                "extensions": [
+                    ".byme"
+                ],
+                "configuration": "./language-configuration.json"
+            }
+        ],
+        "grammars": [
+            {
+                "language": "byteme",
+                "scopeName": "source.byteme",
+                "path": "./syntaxes/byteme.tmLanguage.json"
+            }
+        ],
+        "problemMatchers": [
+            {
+                "name": "byteme-linter",
+                "owner": "byteme",
+                "fileLocation": [
+                    "relative",
+                    "${workspaceFolder}"
+                ],
+                "pattern": {
+                    "regexp": "^\\s*\\[(.*):(\\d+):(\\d+)\\] (.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "column": 3,
+                    "message": 4
+                },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": "^(Analyzer|Parser) Errors:",
+                    "endsPattern": "^exit status 1"
+                }
+            }
+        ]
+    }
+}

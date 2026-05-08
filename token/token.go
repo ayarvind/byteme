@@ -84,6 +84,7 @@ const (
 	BREAK      TokenType = "BREAK"
 	CONTINUE   TokenType = "CONTINUE"
 	YIELD      TokenType = "YIELD"
+	VOID       TokenType = "VOID"
 )
 
 type Token struct {
@@ -126,6 +127,7 @@ var keywords = map[string]TokenType{
 	"break":     BREAK,
 	"continue":  CONTINUE,
 	"yield":     YIELD,
+	"void":      VOID,
 	"@":         AT,
 }
 

@@ -1,0 +1,105 @@
+import "lib/console.byme"
+import "lib/collections.byme"
+import "lib/algorithm.byme"
+import "lib/math.byme"
+import "lib/string.byme"
+import "lib/time.byme"
+import "lib/map.byme"
+import "lib/set.byme"
+import "lib/fs.byme"
+import "lib/json.byme"
+import "lib/random.byme"
+
+fn main() -> void {
+    println("=== ByteMe STL Demo (OOP Style) ===")
+
+    // 1. Collections (List, Stack, Queue)
+    println("\n1. Collections:")
+    let list = Collections.newList()
+    list.add("Apple")
+    list.add("Banana")
+    list.add("Cherry")
+    println("   List size: " + toString(list.size()))
+    println("   List[1]: " + list.get(1))
+
+    let stack = Collections.newStack()
+    stack.push(100)
+    stack.push(200)
+    println("   Stack peek: " + toString(stack.peek()))
+    println("   Stack pop: " + toString(stack.pop()))
+
+    // 2. Math Utility
+    println("\n2. Math Utility:")
+    println("   Pi: " + toString(PI))
+    println("   Sqrt(144): " + toString(Math.sqrt(144)))
+    println("   Max(50, 100): " + toString(Math.max(50, 100)))
+
+    // 3. String Utility
+    println("\n3. String Utility:")
+    let s = "  hello byteme  "
+    println("   Original: '" + s + "'")
+    println("   Trimmed: '" + String.trimSpace(s) + "'")
+    println("   Upper: " + String.toUpper(s))
+    println("   Length: " + toString(String.length(s)))
+
+    // 4. Algorithms
+    println("\n4. Algorithms:")
+    let nums = [42, 7, 19, 1, 33]
+    println("   Unsorted: " + toString(nums))
+    let sortedNums = Algorithm.sorted(nums, null)
+    println("   Sorted: " + toString(sortedNums))
+    println("   Contains 19? " + toString(Algorithm.contains(nums, 19)))
+
+    // 5. Map Utility
+    println("\n5. Map Utility:")
+    let myMap = Maps.new()
+    myMap.put("name", "Arvind")
+    myMap.put("role", "Developer")
+    println("   Map size: " + toString(myMap.size()))
+    println("   Role: " + myMap.get("role"))
+    println("   Has 'name'? " + toString(myMap.has("name")))
+
+    // 6. Set Utility
+    println("\n6. Set Utility:")
+    let mySet = Sets.new()
+    mySet.add(1)
+    mySet.add(2)
+    mySet.add(1) // Duplicate
+    println("   Set size (should be 2): " + toString(mySet.size()))
+    println("   Has 2? " + toString(mySet.has(2)))
+
+    // 7. Time
+    println("\n7. Time:")
+    let now = Time.now()
+    println("   Current Unix Time: " + toString(now))
+    println("   Formatted: " + Time.format(now, DATE_ONLY))
+
+    // 8. File System Utility
+    println("\n8. File System Utility:")
+    let testFile = "demo_test.txt"
+    FS.write(testFile, "ByteMe was here!")
+    println("   File written: " + testFile)
+    println("   Content read: " + FS.read(testFile))
+    FS.remove(testFile)
+    println("   File removed.")
+
+    // 9. JSON Utility
+    println("\n9. JSON Utility:")
+    let jsonData = map()
+    mapSet(jsonData, "id", 101)
+    mapSet(jsonData, "status", "success")
+    let jsonStr = JSON.stringify(jsonData)
+    println("   JSON String: " + jsonStr)
+    let parsed = JSON.parse(jsonStr)
+    println("   Parsed ID: " + toString(mapGet(parsed, "id")))
+
+    // 10. Random Utility
+    println("\n10. Random Utility:")
+    println("   Random (1-100): " + toString(Random.int(1, 101)))
+    let colors = ["Red", "Green", "Blue", "Gold"]
+    println("   Random Choice: " + Random.choice(colors))
+
+    println("\n=== Demo Complete ===")
+}
+
+main()

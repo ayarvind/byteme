@@ -41,6 +41,7 @@ func New(env *environment.Environment, source string, filename string) *Analyzer
 	env.Set("any", "type", environment.PUBLIC, true)
 	env.Set("array", "type", environment.PUBLIC, true)
 	env.Set("map", "type", environment.PUBLIC, true)
+	env.Set("void", "type", environment.PUBLIC, true)
 
 	// Register global built-ins
 	env.Set("chan", "function", environment.PUBLIC, true)
@@ -162,6 +163,7 @@ func New(env *environment.Environment, source string, filename string) *Analyzer
 	env.Set("fSeek",         "function", environment.PUBLIC, true)
 	env.Set("instanceOf",    "function", environment.PUBLIC, true)
 	env.Set("generator",     "function", environment.PUBLIC, true)
+	env.Set("mathRand",      "function", environment.PUBLIC, true)
 
 	a := &Analyzer{
 		env:               env,
@@ -862,7 +864,7 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 		if n.ReturnValue != nil {
 			retType = a.Analyze(n.ReturnValue)
 		} else {
-			retType = "any" // Default for empty return
+			retType = "void" // Default for empty return
 		}
 		
 		if a.currentReturnType != "" && a.currentReturnType != "any" && retType != "any" {
@@ -958,7 +960,7 @@ func (a *Analyzer) preScan(stmt ast.Statement) {
 		switch expr := s.Expression.(type) {
 		case *ast.FunctionLiteral:
 			if expr.Name != nil {
-				a.env.Set(expr.Name.Value, "function", environment.PUBLIC, true)
+					a.env.Set(expr.Name.Value, "function", environment.PUBLIC, true)
 				sig := FunctionSignature{Return: expr.ReturnType}
 				for _, p := range expr.Parameters {
 					sig.Params = append(sig.Params, p.Type)

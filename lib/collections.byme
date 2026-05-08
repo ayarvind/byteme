@@ -1,28 +1,30 @@
 // ByteMe Standard Library: Collections
 // Provides data structures like List (Vector), Stack, and Queue.
 
+struct CollectionsUtility {}
+
 // ── List (Dynamic Array / Vector) ──────────────────────────────────────
 struct List {
     items: any
 }
 
-fn listNew() {
+fn (u: CollectionsUtility) newList() -> List {
     return List([]);
 }
 
-fn listAdd(list: List, item) {
+fn (list: List) add(item) -> void {
     arrayPush(list.items, item);
 }
 
-fn listGet(list: List, index) {
+fn (list: List) get(index) -> any {
     return list.items[index];
 }
 
-fn listSize(list: List) {
+fn (list: List) size() -> int {
     return len(list.items);
 }
 
-fn listClear(list: List) {
+fn (list: List) clear() -> void {
     list.items = [];
 }
 
@@ -31,25 +33,25 @@ struct Stack {
     items: any
 }
 
-fn stackNew() {
+fn (u: CollectionsUtility) newStack() -> Stack {
     return Stack([]);
 }
 
-fn stackPush(s: Stack, item) {
+fn (s: Stack) push(item) -> void {
     arrayPush(s.items, item);
 }
 
-fn stackPop(s: Stack) {
+fn (s: Stack) pop() -> any {
     return arrayPop(s.items);
 }
 
-fn stackPeek(s: Stack) {
+fn (s: Stack) peek() -> any {
     let n = len(s.items);
     if (n == 0) { return null; }
     return s.items[n-1];
 }
 
-fn stackIsEmpty(s: Stack) {
+fn (s: Stack) isEmpty() -> bool {
     return len(s.items) == 0;
 }
 
@@ -58,22 +60,24 @@ struct Queue {
     items: any
 }
 
-fn queueNew() {
+fn (u: CollectionsUtility) newQueue() -> Queue {
     return Queue([]);
 }
 
-fn queueEnqueue(q: Queue, item) {
+fn (q: Queue) enqueue(item) -> void {
     arrayPush(q.items, item);
 }
 
-fn queueDequeue(q: Queue) {
+fn (q: Queue) dequeue() -> any {
     if (len(q.items) == 0) { return null; }
     let item = q.items[0];
     q.items = arraySlice(q.items, 1, len(q.items));
     return item;
 }
 
-fn queuePeek(q: Queue) {
+fn (q: Queue) peek() -> any {
     if (len(q.items) == 0) { return null; }
     return q.items[0];
 }
+
+let Collections = CollectionsUtility();

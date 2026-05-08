@@ -1,0 +1,64 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "ByteMe",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#keywords" },
+    { "include": "#strings" },
+    { "include": "#chars" },
+    { "include": "#numbers" },
+    { "include": "#types" },
+    { "include": "#functions" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [{
+        "name": "comment.line.double-slash.byteme",
+        "match": "//.*$"
+      }]
+    },
+    "keywords": {
+      "patterns": [{
+        "name": "keyword.control.byteme",
+        "match": "\\b(if|else|while|for|in|return|break|continue|yield|try|catch|finally|throw|import|from|async|await|spawn)\\b"
+      }, {
+        "name": "storage.type.byteme",
+        "match": "\\b(fn|let|const|struct|interface|implements|enum|namespace|public|private|extends)\\b"
+      }, {
+        "name": "constant.language.byteme",
+        "match": "\\b(true|false|null)\\b"
+      }]
+    },
+    "strings": {
+      "name": "string.quoted.double.byteme",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        { "name": "constant.character.escape.byteme", "match": "\\\\." }
+      ]
+    },
+    "chars": {
+      "name": "string.quoted.single.byteme",
+      "match": "'(\\\\.|[^'])'"
+    },
+    "numbers": {
+      "patterns": [
+        { "name": "constant.numeric.float.byteme", "match": "\\b\\d+\\.\\d+\\b" },
+        { "name": "constant.numeric.integer.byteme", "match": "\\b\\d+\\b" }
+      ]
+    },
+    "types": {
+      "patterns": [{
+        "name": "entity.name.type.byteme",
+        "match": "\\b(int|float|string|bool|char|array|map|any|void)\\b"
+      }]
+    },
+    "functions": {
+      "patterns": [{
+        "name": "entity.name.function.byteme",
+        "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\s*(?=\\()"
+      }]
+    }
+  },
+  "scopeName": "source.byteme"
+}

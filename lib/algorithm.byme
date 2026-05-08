@@ -1,8 +1,10 @@
 // ByteMe Standard Library: Algorithm
 // Provides common algorithms like sorting and searching.
 
+struct AlgorithmUtility {}
+
 // Sorts an array in-place. Accepts optional comparator function.
-fn sort(arr, comparator) {
+fn (u: AlgorithmUtility) sort(arr, comparator) -> array {
     if (comparator == null) {
         return arraySort(arr);
     }
@@ -10,7 +12,7 @@ fn sort(arr, comparator) {
 }
 
 // Returns a new sorted array. Accepts optional comparator function.
-fn sorted(arr, comparator) {
+fn (u: AlgorithmUtility) sorted(arr, comparator) -> array {
     let newArr = arraySlice(arr, 0, len(arr));
     if (comparator == null) {
         return arraySort(newArr);
@@ -21,7 +23,7 @@ fn sorted(arr, comparator) {
 // ── Functional Programming (Higher-Order Functions) ────────────────────
 
 // Transforms an array using a callback function
-fn algoMap(arr, callback) {
+fn (u: AlgorithmUtility) map(arr, callback) -> array {
     let res = [];
     let i = 0;
     let n = len(arr);
@@ -33,7 +35,7 @@ fn algoMap(arr, callback) {
 }
 
 // Filters an array based on a predicate function
-fn algoFilter(arr, predicate) {
+fn (u: AlgorithmUtility) filter(arr, predicate) -> array {
     let res = [];
     let i = 0;
     let n = len(arr);
@@ -47,7 +49,7 @@ fn algoFilter(arr, predicate) {
 }
 
 // Reduces an array to a single value using an accumulator function
-fn algoReduce(arr, callback, initial) {
+fn (u: AlgorithmUtility) reduce(arr, callback, initial) -> any {
     let acc = initial;
     let i = 0;
     let n = len(arr);
@@ -59,7 +61,7 @@ fn algoReduce(arr, callback, initial) {
 }
 
 // Returns true if all elements satisfy the predicate
-fn every(arr, predicate) {
+fn (u: AlgorithmUtility) every(arr, predicate) -> bool {
     let i = 0;
     let n = len(arr);
     while (i < n) {
@@ -72,7 +74,7 @@ fn every(arr, predicate) {
 }
 
 // Returns true if at least one element satisfies the predicate
-fn some(arr, predicate) {
+fn (u: AlgorithmUtility) some(arr, predicate) -> bool {
     let i = 0;
     let n = len(arr);
     while (i < n) {
@@ -85,7 +87,7 @@ fn some(arr, predicate) {
 }
 
 // Performs a linear search, returns index or -1
-fn find(arr, target) {
+fn (u: AlgorithmUtility) find(arr, target) -> int {
     let i = 0;
     let n = len(arr);
     while (i < n) {
@@ -97,12 +99,12 @@ fn find(arr, target) {
     return -1;
 }
 
-fn contains(arr, target) {
-    return find(arr, target) != -1;
+fn (u: AlgorithmUtility) contains(arr, target) -> bool {
+    return u.find(arr, target) != -1;
 }
 
 // Reverses an array in-place
-fn reverse(arr) {
+fn (u: AlgorithmUtility) reverse(arr) -> array {
     let i = 0;
     let j = len(arr) - 1;
     while (i < j) {
@@ -116,7 +118,7 @@ fn reverse(arr) {
 }
 
 // Counts occurrences of target in arr
-fn count(arr, target) {
+fn (u: AlgorithmUtility) count(arr, target) -> int {
     let c = 0;
     let i = 0;
     let n = len(arr);
@@ -128,3 +130,5 @@ fn count(arr, target) {
     }
     return c;
 }
+
+let Algorithm = AlgorithmUtility();

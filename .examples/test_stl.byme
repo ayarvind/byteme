@@ -7,25 +7,25 @@ println("=== ByteMe Standard Template Library (STL) Test ===");
 // ── 1. Collections: List & Stack ──────────────────────────────
 println("\n1. Collections:");
 let myList = Collections.newList();
-Collections.add(myList, "C++");
-Collections.add(myList, "Go");
-Collections.add(myList, "ByteMe");
-println("   List size  :", Collections.size(myList));
+myList.add("C++");
+myList.add("Go");
+myList.add("ByteMe");
+println("   List size  :", myList.size());
 println("   List items :", myList.items);
 
 let myStack = Collections.newStack();
-Collections.push(myStack, 10);
-Collections.push(myStack, 20);
-Collections.push(myStack, 30);
-println("   Stack peek :", Collections.peek(myStack));
-println("   Stack pop  :", Collections.pop(myStack));
-println("   Stack peek after pop :", Collections.peek(myStack));
+myStack.push(10);
+myStack.push(20);
+myStack.push(30);
+println("   Stack peek :", myStack.peek());
+println("   Stack pop  :", myStack.pop());
+println("   Stack peek after pop :", myStack.peek());
 
 // ── 2. Algorithms ─────────────────────────────────────────────
 println("\n2. Algorithms:");
 let unsorted = [5, 1, 9, 3, 7];
 println("   Unsorted :", unsorted);
-let sorted = Algorithm.sorted(unsorted);
+let sorted = Algorithm.sorted(unsorted, null);
 println("   Sorted   :", sorted);
 println("   Find '9' in unsorted :", Algorithm.find(unsorted, 9));
 println("   Reverse sorted       :", Algorithm.reverse(sorted));

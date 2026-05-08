@@ -1,42 +1,46 @@
 // ByteMe Standard Library: Map
 // Provides an OOP-style wrapper for the built-in map type.
 
-struct MapWrapper {
+struct MapUtility {}
+
+struct Map {
     data: any
 }
 
-fn mapNew() {
-    return MapWrapper(map());
+fn (u: MapUtility) new() -> Map {
+    return Map(map());
 }
 
-fn mapPut(m: MapWrapper, key, val) {
+fn (m: Map) put(key, val) -> void {
     mapSet(m.data, key, val);
 }
 
-fn mapGet(m: MapWrapper, key) {
+fn (m: Map) get(key) -> any {
     return mapGet(m.data, key);
 }
 
-fn mapHas(m: MapWrapper, key) {
+fn (m: Map) has(key) -> bool {
     return mapHas(m.data, key);
 }
 
-fn mapRemove(m: MapWrapper, key) {
+fn (m: Map) remove(key) -> void {
     mapDelete(m.data, key);
 }
 
-fn mapKeys(m: MapWrapper) {
+fn (m: Map) keys() -> array {
     return mapKeys(m.data);
 }
 
-fn mapValues(m: MapWrapper) {
+fn (m: Map) values() -> array {
     return mapValues(m.data);
 }
 
-fn mapSize(m: MapWrapper) {
+fn (m: Map) size() -> int {
     return len(mapKeys(m.data));
 }
 
-fn mapClear(m: MapWrapper) {
+fn (m: Map) clear() -> void {
     m.data = map();
 }
+
+let Maps = MapUtility();

@@ -1,0 +1,23 @@
+// ByteMe Standard Library: Random
+// Provides functions for generating random numbers and selections.
+
+struct RandomUtility {}
+
+// Returns a random integer between min (inclusive) and max (exclusive)
+fn (u: RandomUtility) int(min: int, max: int) -> int {
+    return mathRand(min, max);
+}
+
+// Returns a random integer (large range)
+fn (u: RandomUtility) next() -> int {
+    return mathRand();
+}
+
+// Selects a random element from an array
+fn (u: RandomUtility) choice(arr: array) -> any {
+    if (len(arr) == 0) { return null; }
+    let index = mathRand(0, len(arr));
+    return arr[index];
+}
+
+let Random = RandomUtility();

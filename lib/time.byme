@@ -1,25 +1,30 @@
 // ByteMe Standard Library: Time
 // Provides date and time manipulation utilities.
 
+struct TimeUtility {}
+
 // Returns current Unix timestamp
-fn now() {
+fn (u: TimeUtility) now() {
     return timeNow();
 }
 
 // Sleeps for n seconds
-fn sleep(seconds) {
+fn (u: TimeUtility) sleep(seconds) {
     timeSleep(seconds);
 }
 
 // Formats a Unix timestamp using a Go-style layout string
-fn format(timestamp, layout) {
+fn (u: TimeUtility) format(timestamp, layout) {
     return timeFormat(timestamp, layout);
 }
 
 // Parses a time string into a Unix timestamp
-fn parse(layout, value) {
+fn (u: TimeUtility) parse(layout, value) {
     return timeParse(layout, value);
 }
+
+// Global instance
+let Time = TimeUtility();
 
 // Common Layouts
 const ANSIC       = "Mon Jan _2 15:04:05 2006";

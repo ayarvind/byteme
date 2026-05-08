@@ -1,0 +1,11 @@
+import "lib/string.byme"
+
+fn main()->void{
+    let name:string  = "Arvind Yadav"
+    println(String.length("Arvind Yadav")) 
+    let x = 10
+    let y = 20
+    println(x + y)
+}
+
+main()

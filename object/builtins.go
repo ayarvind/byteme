@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"path/filepath"
 	"math"
+	"math/rand"
 	"strings"
 	"unicode"
 	"bufio"
@@ -1120,6 +1121,43 @@ var Builtins = []*Builtin{
 				return MakeGenerator(fn, args[1:])
 			}
 			return NULL
+		},
+	},
+	{ // 106: fileAppend
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 { return NULL }
+			path, ok := args[0].(*String)
+			content, ok2 := args[1].(*String)
+			if !ok || !ok2 { return NULL }
+			f, err := os.OpenFile(path.Value, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			if err != nil { return &Error{Message: err.Error()} }
+			defer f.Close()
+			if _, err := f.WriteString(content.Value); err != nil {
+				return &Error{Message: err.Error()}
+			}
+			return TRUE
+		},
+	},
+	{ // 107: fileExists
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 { return FALSE }
+			path, ok := args[0].(*String)
+			if !ok { return FALSE }
+			_, err := os.Stat(path.Value)
+			if os.IsNotExist(err) { return FALSE }
+			return TRUE
+		},
+	},
+	{ // 108: mathRand
+		Fn: func(args ...Object) Object {
+			if len(args) == 2 {
+				min, ok1 := args[0].(*Integer)
+				max, ok2 := args[1].(*Integer)
+				if ok1 && ok2 {
+					return &Integer{Value: min.Value + rand.Int63n(max.Value-min.Value)}
+				}
+			}
+			return &Integer{Value: rand.Int63()}
 		},
 	},
 }

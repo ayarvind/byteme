@@ -1,0 +1,41 @@
+// ByteMe Standard Library: File System
+// Provides functions for interacting with the file system.
+
+struct FileSystemUtility {}
+
+// Reads the entire contents of a file as a string
+fn (u: FileSystemUtility) read(path: string) -> string {
+    return fileRead(path);
+}
+
+// Writes string content to a file, overwriting if it exists
+fn (u: FileSystemUtility) write(path: string, content: string) -> void {
+    fileWrite(path, content);
+}
+
+// Appends string content to a file
+fn (u: FileSystemUtility) append(path: string, content: string) -> void {
+    fileAppend(path, content);
+}
+
+// Checks if a file or directory exists at the given path
+fn (u: FileSystemUtility) exists(path: string) -> bool {
+    return fileExists(path);
+}
+
+// Creates a directory
+fn (u: FileSystemUtility) mkdir(path: string) -> void {
+    osMkdir(path);
+}
+
+// Removes a file
+fn (u: FileSystemUtility) remove(path: string) -> void {
+    osRemove(path);
+}
+
+// Lists contents of a directory
+fn (u: FileSystemUtility) list(path: string) -> array {
+    return osListdir(path);
+}
+
+let FS = FileSystemUtility();

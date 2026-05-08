@@ -1,0 +1,19 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "ByteMe: Lint File",
+            "type": "shell",
+            "command": "go run main.go -lint ${file}",
+            "problemMatcher": "$byteme-linter",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "silent",
+                "panel": "shared"
+            }
+        }
+    ]
+}

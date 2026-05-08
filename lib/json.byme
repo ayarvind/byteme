@@ -1,0 +1,16 @@
+// ByteMe Standard Library: JSON
+// Provides functions for parsing and stringifying JSON data.
+
+struct JSONUtility {}
+
+// Parses a JSON string into a ByteMe object (Map or Array)
+fn (u: JSONUtility) parse(jsonStr: string) -> any {
+    return jsonParse(jsonStr);
+}
+
+// Converts a ByteMe object into a JSON string
+fn (u: JSONUtility) stringify(data: any) -> string {
+    return jsonStringify(data);
+}
+
+let JSON = JSONUtility();

@@ -18,14 +18,29 @@ import (
 	"github.com/byteme/compiler/object"
 	"github.com/byteme/compiler/repl"
 	"github.com/byteme/compiler/vm"
+	"math/rand"
+	"time"
 )
 
 func init() {
+	rand.Seed(time.Now().UnixNano())
+	
 	// Register a native Go function
 	evaluator.RegisterNative("goGreet", func(args ...object.Object) object.Object {
 		if len(args) != 1 { return object.NULL }
 		name := args[0].Inspect()
 		return &object.String{Value: fmt.Sprintf("Hello %s, I am a Go function!", name)}
+	})
+
+	evaluator.RegisterNative("mathRand", func(args ...object.Object) object.Object {
+		if len(args) == 2 {
+			min, ok1 := args[0].(*object.Integer)
+			max, ok2 := args[1].(*object.Integer)
+			if ok1 && ok2 {
+				return &object.Integer{Value: min.Value + rand.Int63n(max.Value-min.Value)}
+			}
+		}
+		return &object.Integer{Value: rand.Int63()}
 	})
 }
 

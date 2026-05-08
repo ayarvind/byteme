@@ -71,6 +71,9 @@ fn (u: StringUtility) repeat(s: string, n: int) -> string { return strRepeat(s, 
 fn (u: StringUtility) reverse(s: string) -> string {
     return strReverse(s);
 }
+fn (u: StringUtility) length(s: string)-> int {
+    return len(s);
+}
 
 // Capitalizes the first letter of the string.
 fn (u: StringUtility) capitalize(s: string) -> string {

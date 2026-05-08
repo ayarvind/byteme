@@ -2,6 +2,8 @@
 // This module provides common mathematical functions and constants.
 // Leverages native Go math implementations for performance and precision.
 
+struct MathUtility {}
+
 // ── Constants ───────────────────────────────────────────────────────────
 let PI      = 3.14159265358979323846;
 let E       = 2.71828182845904523536;
@@ -15,81 +17,81 @@ let LOG10E  = 0.43429448190325182765;
 // ── Basic Functions ─────────────────────────────────────────────────────
 
 // Returns the absolute value of x
-fn abs(x) { return mathAbs(x); }
+fn (u: MathUtility) abs(x) { return mathAbs(x); }
 
 // Returns the square root of x
-fn sqrt(x) { return mathSqrt(x); }
+fn (u: MathUtility) sqrt(x) { return mathSqrt(x); }
 
 // Returns base raised to the power of exp
-fn pow(base, exp) { return mathPow(base, exp); }
+fn (u: MathUtility) pow(base, exp) { return mathPow(base, exp); }
 
 // Returns the largest integer less than or equal to x
-fn floor(x) { return mathFloor(x); }
+fn (u: MathUtility) floor(x) { return mathFloor(x); }
 
 // Returns the smallest integer greater than or equal to x
-fn ceil(x) { return mathCeil(x); }
+fn (u: MathUtility) ceil(x) { return mathCeil(x); }
 
 // Returns the maximum of a and b
-fn max(a, b) {
+fn (u: MathUtility) max(a, b) {
     if (a > b) { return a; }
     return b;
 }
 
 // Returns the minimum of a and b
-fn min(a, b) {
+fn (u: MathUtility) min(a, b) {
     if (a < b) { return a; }
     return b;
 }
 
 // ── Trigonometry ────────────────────────────────────────────────────────
 
-fn sin(x)   { return mathSin(x); }
-fn cos(x)   { return mathCos(x); }
-fn tan(x)   { return mathTan(x); }
+fn (u: MathUtility) sin(x)   { return mathSin(x); }
+fn (u: MathUtility) cos(x)   { return mathCos(x); }
+fn (u: MathUtility) tan(x)   { return mathTan(x); }
 
-fn asin(x)  { return mathAsin(x); }
-fn acos(x)  { return mathAcos(x); }
-fn atan(x)  { return mathAtan(x); }
-fn atan2(y, x) { return mathAtan2(y, x); }
+fn (u: MathUtility) asin(x)  { return mathAsin(x); }
+fn (u: MathUtility) acos(x)  { return mathAcos(x); }
+fn (u: MathUtility) atan(x)  { return mathAtan(x); }
+fn (u: MathUtility) atan2(y, x) { return mathAtan2(y, x); }
 
 // Conversion helpers
-fn radians(deg) { return deg * (PI / 180.0); }
-fn degrees(rad) { return rad * (180.0 / PI); }
+fn (u: MathUtility) radians(deg) { return deg * (PI / 180.0); }
+fn (u: MathUtility) degrees(rad) { return rad * (180.0 / PI); }
 
 // ── Logarithms and Exponentials ─────────────────────────────────────────
 
 // Returns e^x
-fn exp(x)   { return mathExp(x); }
+fn (u: MathUtility) exp(x)   { return mathExp(x); }
 
 // Returns the natural logarithm (base e) of x
-fn log(x)   { return mathLog(x); }
+fn (u: MathUtility) log(x)   { return mathLog(x); }
 
 // Returns the base-10 logarithm of x
-fn log10(x) { return mathLog10(x); }
+fn (u: MathUtility) log10(x) { return mathLog10(x); }
 
 // Returns the logarithm of x with a custom base
-fn logBase(x, base) {
+fn (u: MathUtility) logBase(x, base) {
     return mathLog(x) / mathLog(base);
 }
 
 // ── Utility ─────────────────────────────────────────────────────────────
 
 // Linearly interpolates between a and b by t
-fn lerp(a, b, t) {
+fn (u: MathUtility) lerp(a, b, t) {
     return a + (b - a) * t;
 }
 
 // Clamps x between min and max
-fn clamp(x, minVal, maxVal) {
+fn (u: MathUtility) clamp(x, minVal, maxVal) {
     if (x < minVal) { return minVal; }
     if (x > maxVal) { return maxVal; }
     return x;
 }
 
 // Greatest Common Divisor
-fn gcd(a, b) {
-    let x = abs(a);
-    let y = abs(b);
+fn (u: MathUtility) gcd(a, b) {
+    let x = mathAbs(a);
+    let y = mathAbs(b);
     while (y != 0) {
         let temp = y;
         y = x % y;
@@ -99,15 +101,18 @@ fn gcd(a, b) {
 }
 
 // Least Common Multiple
-fn lcm(a, b) {
+fn (u: MathUtility) lcm(a, b) {
     if (a == 0 | b == 0) { return 0; }
-    return abs(a * b) / gcd(a, b);
+    return mathAbs(a * b) / u.gcd(a, b);
 }
 
-// Bitwise and shift operations (can be used via operators or these funcs)
-fn lshift(val, n) { return val << n; }
-fn rshift(val, n) { return val >> n; }
-fn bitAnd(a, b)   { return a & b; }
-fn bitOr(a, b)    { return a | b; }
-fn bitXor(a, b)   { return a ^ b; }
-fn bitNot(a)      { return ~a; }
+// Bitwise and shift operations
+fn (u: MathUtility) lshift(val, n) { return val << n; }
+fn (u: MathUtility) rshift(val, n) { return val >> n; }
+fn (u: MathUtility) bitAnd(a, b)   { return a & b; }
+fn (u: MathUtility) bitOr(a, b)    { return a | b; }
+fn (u: MathUtility) bitXor(a, b)   { return a ^ b; }
+fn (u: MathUtility) bitNot(a)      { return ~a; }
+
+// Global instance
+let Math = MathUtility();

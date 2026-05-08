@@ -1,68 +1,72 @@
 // ByteMe Standard Library: Set
 // Provides a Set data structure for unique value storage.
 
+struct SetUtility {}
+
 struct Set {
     data: any
 }
 
-fn setNew() {
+fn (u: SetUtility) new() -> Set {
     return Set(map());
 }
 
-fn setAdd(s: Set, val) {
+fn (s: Set) add(val) -> void {
     mapSet(s.data, val, true);
 }
 
-fn setRemove(s: Set, val) {
+fn (s: Set) remove(val) -> void {
     mapDelete(s.data, val);
 }
 
-fn setHas(s: Set, val) {
+fn (s: Set) has(val) -> bool {
     return mapHas(s.data, val);
 }
 
-fn setSize(s: Set) {
+fn (s: Set) size() -> int {
     return len(mapKeys(s.data));
 }
 
-fn setClear(s: Set) {
+fn (s: Set) clear() -> void {
     s.data = map();
 }
 
-fn setToArray(s: Set) {
+fn (s: Set) toArray() -> array {
     return mapKeys(s.data);
 }
 
 // Mathematical Set Operations
 
-fn setUnion(a: Set, b: Set) {
-    let res = setNew();
-    let keysA = setToArray(a);
-    let keysB = setToArray(b);
+fn (s: Set) union(other: Set) -> Set {
+    let res = SetUtility().new();
+    let keysA = s.toArray();
+    let keysB = other.toArray();
     
     let i = 0;
     while (i < len(keysA)) {
-        setAdd(res, keysA[i]);
+        res.add(keysA[i]);
         i = i + 1;
     }
     
     i = 0;
     while (i < len(keysB)) {
-        setAdd(res, keysB[i]);
+        res.add(keysB[i]);
         i = i + 1;
     }
     return res;
 }
 
-fn setIntersect(a: Set, b: Set) {
-    let res = setNew();
-    let keysA = setToArray(a);
+fn (s: Set) intersect(other: Set) -> Set {
+    let res = SetUtility().new();
+    let keysA = s.toArray();
     let i = 0;
     while (i < len(keysA)) {
-        if (setHas(b, keysA[i])) {
-            setAdd(res, keysA[i]);
+        if (other.has(keysA[i])) {
+            res.add(keysA[i]);
         }
         i = i + 1;
     }
     return res;
 }
+
+let Sets = SetUtility();
