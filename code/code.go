@@ -62,6 +62,8 @@ const (
 	OpIterInit
 	OpIterNext
 	OpYield
+	OpMap        // operand: 2-byte number of key-value pairs
+	OpDup        // duplicate the top value on the stack
 )
 
 type Definition struct {
@@ -121,6 +123,8 @@ var definitions = map[Opcode]*Definition{
 	OpIterInit:      {"OpIterInit", []int{}},
 	OpIterNext:      {"OpIterNext", []int{}},
 	OpYield:         {"OpYield", []int{}},
+	OpMap:           {"OpMap", []int{2}},
+	OpDup:           {"OpDup", []int{}},
 }
 
 func Lookup(op byte) (*Definition, error) {

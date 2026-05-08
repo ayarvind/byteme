@@ -113,7 +113,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 		// If it's a 'from' import, we hide the module's variables from the global scope,
 		// except for the specifically imported ones.
 		var savedStore map[string]Symbol
-		if n.Token.Type == token.FROM {
+		if n.Token.Type == token.FROM || n.Name != nil {
 			savedStore = make(map[string]Symbol)
 			for k, v := range c.symbolTable.store {
 				savedStore[k] = v
@@ -141,6 +141,30 @@ func (c *Compiler) Compile(node ast.Node) error {
 				}
 			}
 			c.symbolTable.store = newStore
+		} else if n.Name != nil {
+			// Module aliasing: import "path" as alias
+			// 1. Collect all NEW symbols defined in the module
+			newSymbols := []string{}
+			for k := range c.symbolTable.store {
+				if _, ok := savedStore[k]; !ok {
+					newSymbols = append(newSymbols, k)
+				}
+			}
+
+			// 2. Emit code to create a Map containing these symbols
+			for _, name := range newSymbols {
+				sym := c.symbolTable.store[name]
+				c.emit(code.OpConstant, c.addConstant(&object.String{Value: name}))
+				c.emit(code.OpGetGlobal, sym.Index)
+			}
+			c.emit(code.OpMap, len(newSymbols))
+
+			// 3. Restore previous symbols
+			c.symbolTable.store = savedStore
+
+			// 4. Define the alias and assign the map to it
+			aliasSym := c.symbolTable.Define(n.Name.Value, "map")
+			c.emit(code.OpSetGlobal, aliasSym.Index)
 		}
 
 		return nil
@@ -380,35 +404,36 @@ func (c *Compiler) Compile(node ast.Node) error {
 		}
 		c.emit(code.OpArray, len(n.Elements))
 
+	case *ast.LetStatement:
+		err := c.Compile(n.Value)
+		if err != nil { return err }
+
+		if n.Destructuring != nil {
+			c.emitUnpack(n.Destructuring)
+		} else {
+			symbol := c.symbolTable.Define(n.Name.Value, n.Type)
+			if symbol.Scope == GlobalScope {
+				c.emit(code.OpSetGlobal, symbol.Index)
+			} else {
+				c.emit(code.OpSetLocal, symbol.Index)
+			}
+		}
+
 	case *ast.ConstStatement:
 		err := c.Compile(n.Value)
-		if err != nil {
-			return err
-		}
-		symbol := c.symbolTable.Define(n.Name.Value)
-		if symbol.Scope == GlobalScope {
-			c.emit(code.OpSetGlobal, symbol.Index)
-		} else {
-			c.emit(code.OpSetLocal, symbol.Index)
-		}
-		return nil
+		if err != nil { return err }
 
-	case *ast.LetStatement:
-		if n.Value != nil {
-			err := c.Compile(n.Value)
-			if err != nil {
-				return err
+		if n.Destructuring != nil {
+			c.emitUnpack(n.Destructuring)
+		} else {
+			symbol := c.symbolTable.Define(n.Name.Value, n.Type)
+			symbol.IsConst = true
+			if symbol.Scope == GlobalScope {
+				c.emit(code.OpSetGlobal, symbol.Index)
+			} else {
+				c.emit(code.OpSetLocal, symbol.Index)
 			}
-		} else {
-			c.emit(code.OpNull)
 		}
-		symbol := c.symbolTable.Define(n.Name.Value)
-		if symbol.Scope == GlobalScope {
-			c.emit(code.OpSetGlobal, symbol.Index)
-		} else {
-			c.emit(code.OpSetLocal, symbol.Index)
-		}
-		return nil
 
 	case *ast.IfExpression:
 		err := c.Compile(n.Condition)
@@ -423,15 +448,16 @@ func (c *Compiler) Compile(node ast.Node) error {
 		if err != nil {
 			return err
 		}
-
-		// Remove the pop if it was an expression statement? No, the VM needs to be consistent.
-		// For now, if consequence is empty, we might have issues.
+		// IfExpression consequence is always a *BlockStatement, which doesn't push a value.
+		// Since IfExpression is an expression, we must push a value (null) at the end of the block.
+		c.emit(code.OpNull)
 
 		if n.Alternative == nil {
 			afterConsequencePos := len(c.instructions)
 			c.changeOperand(jumpNotTruthyPos, afterConsequencePos)
-			// Push NULL so the OpPop of the ExpressionStatement doesn't panic
-			c.emit(code.OpNull) // Placeholder for 'if' result
+			// We already pushed OpNull for the consequence.
+			// But for the 'false' case where there is no alternative, we need another Null.
+			c.emit(code.OpNull)
 		} else {
 			jumpPos := c.emit(code.OpJump, 9999)
 
@@ -442,6 +468,8 @@ func (c *Compiler) Compile(node ast.Node) error {
 			if err != nil {
 				return err
 			}
+			// Alternative is also a *BlockStatement, push null.
+			c.emit(code.OpNull)
 
 			afterAlternativePos := len(c.instructions)
 			c.changeOperand(jumpPos, afterAlternativePos)
@@ -829,6 +857,37 @@ func (c *Compiler) Compile(node ast.Node) error {
 		}
 		c.emit(code.OpAwait)
 
+	case *ast.LambdaExpression:
+		enclosedCompiler := NewEnclosedCompiler(c)
+
+		for _, p := range n.Parameters {
+			enclosedCompiler.symbolTable.Define(p.Name.Value)
+		}
+
+		err := enclosedCompiler.Compile(n.Body)
+		if err != nil { return err }
+
+		if !enclosedCompiler.lastInstructionIs(code.OpReturnValue) && !enclosedCompiler.lastInstructionIs(code.OpReturn) {
+			if _, ok := n.Body.(ast.Expression); ok {
+				enclosedCompiler.emit(code.OpReturnValue)
+			} else {
+				enclosedCompiler.emit(code.OpReturn)
+			}
+		}
+
+		compiledFn := &object.CompiledFunction{
+			Instructions:  enclosedCompiler.instructions,
+			NumLocals:     enclosedCompiler.symbolTable.numDefinitions,
+			NumParameters: len(n.Parameters),
+			Filename:      c.Filename,
+		}
+
+		freeSymbols := enclosedCompiler.symbolTable.FreeSymbols
+		for _, s := range freeSymbols {
+			c.loadSymbol(s)
+		}
+		c.emit(code.OpClosure, c.addConstant(compiledFn), len(freeSymbols))
+
 	case *ast.IndexExpression:
 		err := c.Compile(n.Left)
 		if err != nil {
@@ -1077,5 +1136,24 @@ func (c *Compiler) changeOperand(opPos int, operand int) {
 func (c *Compiler) replaceInstruction(pos int, newInstruction []byte) {
 	for i := 0; i < len(newInstruction); i++ {
 		c.instructions[pos+i] = newInstruction[i]
+	}
+}
+func (c *Compiler) emitUnpack(pattern ast.Expression) {
+	switch p := pattern.(type) {
+	case *ast.Identifier:
+		symbol := c.symbolTable.Define(p.Value, "any")
+		if symbol.Scope == GlobalScope {
+			c.emit(code.OpSetGlobal, symbol.Index)
+		} else {
+			c.emit(code.OpSetLocal, symbol.Index)
+		}
+	case *ast.ArrayLiteral:
+		for i, el := range p.Elements {
+			c.emit(code.OpDup)
+			c.emit(code.OpConstant, c.addConstant(&object.Integer{Value: int64(i)}))
+			c.emit(code.OpIndex)
+			c.emitUnpack(el)
+		}
+		c.emit(code.OpPop) // pop the duplicated array
 	}
 }

@@ -50,6 +50,7 @@ const (
 	DOT       TokenType = "."
 	AT        TokenType = "@"
 	MOD       TokenType = "%"
+	LAMBDA_ARROW TokenType = "=>"
 
 	// Keywords
 	FUNCTION  TokenType = "FUNCTION"
@@ -85,6 +86,7 @@ const (
 	CONTINUE   TokenType = "CONTINUE"
 	YIELD      TokenType = "YIELD"
 	VOID       TokenType = "VOID"
+	AS         TokenType = "AS"
 )
 
 type Token struct {
@@ -128,6 +130,7 @@ var keywords = map[string]TokenType{
 	"continue":  CONTINUE,
 	"yield":     YIELD,
 	"void":      VOID,
+	"as":        AS,
 	"@":         AT,
 }
 

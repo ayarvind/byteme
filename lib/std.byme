@@ -1,0 +1,30 @@
+struct ResultInstance {
+    value: any
+    error: any
+    ok: bool
+}
+
+struct OptionInstance {
+    value: any
+    present: bool
+}
+
+struct StdUtility {}
+
+fn (s: StdUtility) ok(val: any) -> ResultInstance {
+    return ResultInstance(val, null, true);
+}
+
+fn (s: StdUtility) error(err: any) -> ResultInstance {
+    return ResultInstance(null, err, false);
+}
+
+fn (s: StdUtility) some(val: any) -> OptionInstance {
+    return OptionInstance(val, true);
+}
+
+fn (s: StdUtility) none() -> OptionInstance {
+    return OptionInstance(null, false);
+}
+
+let Std = StdUtility();

@@ -71,7 +71,8 @@ func (is *ImportStatement) String() string {
 
 type LetStatement struct {
 	Token token.Token
-	Name  *Identifier
+	Name  *Identifier // Optional for simple cases
+	Destructuring Expression // New: for [a, b] or {a, b}
 	Value Expression
 	Type  string
 }
@@ -80,7 +81,13 @@ func (ls *LetStatement) TokenLiteral() string { return ls.Token.Literal }
 func (ls *LetStatement) GetToken() token.Token { return ls.Token }
 func (ls *LetStatement) String() string {
 	var out bytes.Buffer
-	out.WriteString(ls.TokenLiteral() + " " + ls.Name.String() + ": " + ls.Type)
+	out.WriteString(ls.TokenLiteral() + " ")
+	if ls.Destructuring != nil {
+		out.WriteString(ls.Destructuring.String())
+	} else {
+		out.WriteString(ls.Name.String())
+	}
+	out.WriteString(": " + ls.Type)
 	if ls.Value != nil {
 		out.WriteString(" = " + ls.Value.String())
 	}
@@ -91,6 +98,7 @@ func (ls *LetStatement) String() string {
 type ConstStatement struct {
 	Token token.Token
 	Name  *Identifier
+	Destructuring Expression // New
 	Value Expression
 	Type  string
 }
@@ -419,6 +427,26 @@ func (fl *FunctionLiteral) String() string {
 	out.WriteString("fn ")
 	if fl.Name != nil { out.WriteString(fl.Name.Value) }
 	out.WriteString("(...) " + fl.Body.String())
+	return out.String()
+}
+
+type LambdaExpression struct {
+	Token      token.Token // =>
+	Parameters []*Parameter
+	Body       Node // Expression or BlockStatement
+	ReturnType string
+}
+func (le *LambdaExpression) expressionNode()      {}
+func (le *LambdaExpression) TokenLiteral() string { return le.Token.Literal }
+func (le *LambdaExpression) GetToken() token.Token { return le.Token }
+func (le *LambdaExpression) String() string {
+	var out bytes.Buffer
+	out.WriteString("(")
+	for i, p := range le.Parameters {
+		out.WriteString(p.String())
+		if i < len(le.Parameters)-1 { out.WriteString(", ") }
+	}
+	out.WriteString(") => " + le.Body.String())
 	return out.String()
 }
 

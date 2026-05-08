@@ -574,6 +574,26 @@ func (vm *VM) Run() error {
 		case code.OpYield:
 			vm.YieldedValue = vm.pop()
 			return ErrYield
+
+		case code.OpMap:
+			numElements := int(binary.BigEndian.Uint16(ins[ip+1:]))
+			vm.currentFrame().ip += 2
+
+			pairs := make(map[string]object.MapPair)
+			for i := 0; i < numElements; i++ {
+				value := vm.pop()
+				key := vm.pop()
+				
+				sKey, ok := key.(*object.String)
+				if !ok {
+					return fmt.Errorf("map keys must be strings, got %s", key.Type())
+				}
+				pairs[sKey.Value] = object.MapPair{Key: sKey, Value: value}
+			}
+			vm.push(&object.Map{Pairs: pairs})
+
+		case code.OpDup:
+			vm.push(vm.stack[vm.sp-1])
 		}
 	}
 	return nil

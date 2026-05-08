@@ -1,0 +1,46 @@
+// 1. Module Aliasing
+import "lib/math.byme" as m;
+println("--- 1. Module Aliasing ---");
+println("Math.PI via alias: " + m.PI);
+
+// 2. Specific Import
+from "lib/std.byme" import Std;
+println("\n--- 2. Specific Import ---");
+let res = Std.ok(42);
+println("Result is ok? " + res.ok);
+
+// 3. Destructuring
+println("\n--- 3. Destructuring ---");
+let [x, y] = [100, 200];
+println("x: " + x + ", y: " + y);
+
+let [[a, b], c] = [[1, 2], 3];
+println("Nested: a=" + a + ", b=" + b + ", c=" + c);
+
+// 4. Lambdas
+println("\n--- 4. Lambdas ---");
+let add = (a, b) => a + b;
+let square = (x) => x * x;
+println("10 + 20 = " + add(10, 20));
+println("Square of 9 = " + square(9));
+
+let greet = () => println("Hello from lambda!");
+greet();
+
+// 5. Result/Option Pattern
+println("\n--- 5. Result/Option ---");
+fn divide(a, b) {
+    if (b == 0) {
+        return Std.error("Division by zero");
+    }
+    return Std.ok(a / b);
+}
+
+let result = divide(10, 2);
+if (result.ok) {
+    println("Result: " + result.value);
+} else {
+    println("Error: " + result.error);
+}
+
+println("\n=== Advanced Demo Complete ===");

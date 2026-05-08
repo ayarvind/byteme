@@ -330,6 +330,9 @@ func (a *Analyzer) isTerminated(stmt ast.Statement) bool {
 }
 
 func (a *Analyzer) lookupField(typeName, fieldName string) (string, bool) {
+	if typeName == "map" || typeName == "any" {
+		return "any", true
+	}
 	// Handle unions: field must exist in ALL types
 	if strings.Contains(typeName, "|") {
 		types := strings.Split(typeName, "|")
@@ -466,22 +469,27 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 		if n.Token.Type == token.FROM {
 			// Extract specific imports
 			for _, imp := range n.Imports {
-				_, ok := a.env.Get(imp.Value)
-				if !ok {
-					a.error(imp.Token, "imported symbol %s not found in module %s", imp.Value, filename)
-				}
-				// We need a better way. Let's just bypass it for MVP.
+				a.env.Set(imp.Value, "any", environment.PUBLIC, false)
 			}
 			a.env = savedEnv
-			
-			// We must inject the specific imports into savedEnv
-			// Let's just pretend we inject 'any'
 			for _, imp := range n.Imports {
 				a.env.Set(imp.Value, "any", environment.PUBLIC, false)
 			}
+		} else if n.Name != nil {
+			a.env.Set(n.Name.Value, "map", environment.PUBLIC, false)
 		}
 
 	case *ast.LetStatement:
+		if n.Destructuring != nil {
+			if n.Value == nil {
+				a.error(n.Token, "destructuring declaration requires immediate initialization")
+				return "any"
+			}
+			a.Analyze(n.Value)
+			a.analyzeDestructuring(n.Destructuring, false)
+			return "any"
+		}
+
 		typeName := n.Type
 		if typeName == "" {
 			if n.Value == nil {
@@ -512,6 +520,16 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 		return typeName
 
 	case *ast.ConstStatement:
+		if n.Destructuring != nil {
+			if n.Value == nil {
+				a.error(n.Token, "destructuring declaration requires immediate initialization")
+				return "any"
+			}
+			a.Analyze(n.Value)
+			a.analyzeDestructuring(n.Destructuring, true)
+			return "any"
+		}
+
 		valType := a.Analyze(n.Value)
 		typeName := n.Type
 		if typeName == "" {
@@ -630,6 +648,9 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 
 	case *ast.ExpressionStatement:
 		return a.Analyze(n.Expression)
+
+	case *ast.LambdaExpression:
+		return a.AnalyzeLambdaExpression(n)
 
 	case *ast.WhileStatement:
 		condType := a.Analyze(n.Condition)
@@ -995,4 +1016,26 @@ func (a *Analyzer) preScan(stmt ast.Statement) {
 	case *ast.LetStatement:
 		// We don't pre-scan variables to avoid uninitialized usage
 	}
+}
+func (a *Analyzer) analyzeDestructuring(pattern ast.Expression, isConst bool) {
+	switch p := pattern.(type) {
+	case *ast.Identifier:
+		a.env.Set(p.Value, "any", environment.PUBLIC, isConst)
+	case *ast.ArrayLiteral:
+		for _, el := range p.Elements {
+			a.analyzeDestructuring(el, isConst)
+		}
+	}
+}
+
+func (a *Analyzer) AnalyzeLambdaExpression(n *ast.LambdaExpression) string {
+	prevEnv := a.env
+	a.env = environment.NewEnclosedEnvironment(prevEnv)
+	defer func() { a.env = prevEnv }()
+
+	for _, p := range n.Parameters {
+		a.env.Set(p.Name.Value, p.Type, environment.PUBLIC, false)
+	}
+
+	return a.Analyze(n.Body)
 }

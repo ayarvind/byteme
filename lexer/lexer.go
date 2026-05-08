@@ -56,6 +56,10 @@ func (l *Lexer) NextToken() token.Token {
 			ch := l.ch
 			l.readChar()
 			tok = token.Token{Type: token.EQ, Literal: string(ch) + string(l.ch), Line: startLine, Column: startColumn}
+		} else if l.peekChar() == '>' {
+			ch := l.ch
+			l.readChar()
+			tok = token.Token{Type: token.LAMBDA_ARROW, Literal: string(ch) + string(l.ch), Line: startLine, Column: startColumn}
 		} else {
 			tok = l.newToken(token.ASSIGN, l.ch)
 		}

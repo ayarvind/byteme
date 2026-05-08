@@ -58,7 +58,7 @@ func (p *Parser) registerParsers() {
 	p.registerPrefix(token.BIT_NOT, p.parsePrefixExpression)
 	p.registerPrefix(token.TRUE, p.parseBoolean)
 	p.registerPrefix(token.FALSE, p.parseBoolean)
-	p.registerPrefix(token.LPAREN, p.parseGroupedExpression)
+	p.registerPrefix(token.LPAREN, p.parseLambdaOrGroupedExpression)
 	p.registerPrefix(token.LBRACKET, p.parseArrayLiteral)
 	p.registerPrefix(token.IF, p.parseIfExpression)
 	p.registerPrefix(token.FUNCTION, p.parseFunctionLiteral)
@@ -255,8 +255,14 @@ func (p *Parser) parseImportStatement() *ast.ImportStatement {
 
 	stmt.Path = &ast.StringLiteral{Token: p.curToken, Value: p.curToken.Literal}
 
-	if p.peekTokenIs(token.IDENT) {
-		// e.g. import "math" as math
+	if p.peekTokenIs(token.AS) {
+		p.nextToken() // consume 'as'
+		if !p.expectPeek(token.IDENT) {
+			return nil
+		}
+		stmt.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	} else if p.peekTokenIs(token.IDENT) {
+		// support legacy 'import "path" name'
 		p.nextToken()
 		stmt.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
 	}
@@ -535,11 +541,15 @@ func (p *Parser) parseTypeParameters() []*ast.Identifier {
 func (p *Parser) parseLetStatement() *ast.LetStatement {
 	stmt := &ast.LetStatement{Token: p.curToken}
 
-	if !p.expectPeek(token.IDENT) {
-		return nil
+	if p.peekTokenIs(token.LBRACKET) || p.peekTokenIs(token.LBRACE) {
+		p.nextToken()
+		stmt.Destructuring = p.parseExpression(EQUALS)
+	} else {
+		if !p.expectPeek(token.IDENT) {
+			return nil
+		}
+		stmt.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
 	}
-
-	stmt.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
 
 	if p.peekTokenIs(token.COLON) {
 		p.nextToken() // cur is :
@@ -563,11 +573,15 @@ func (p *Parser) parseLetStatement() *ast.LetStatement {
 func (p *Parser) parseConstStatement() *ast.ConstStatement {
 	stmt := &ast.ConstStatement{Token: p.curToken}
 
-	if !p.expectPeek(token.IDENT) {
-		return nil
+	if p.peekTokenIs(token.LBRACKET) || p.peekTokenIs(token.LBRACE) {
+		p.nextToken()
+		stmt.Destructuring = p.parseExpression(EQUALS)
+	} else {
+		if !p.expectPeek(token.IDENT) {
+			return nil
+		}
+		stmt.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
 	}
-
-	stmt.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
 
 	if p.peekTokenIs(token.COLON) {
 		p.nextToken() // cur is :
@@ -580,7 +594,6 @@ func (p *Parser) parseConstStatement() *ast.ConstStatement {
 	}
 
 	p.nextToken()
-
 	stmt.Value = p.parseExpression(LOWEST)
 
 	if p.peekTokenIs(token.SEMICOLON) {
@@ -771,6 +784,60 @@ func (p *Parser) parseInfixExpression(left ast.Expression) ast.Expression {
 	expression.Right = p.parseExpression(precedence)
 
 	return expression
+}
+
+func (p *Parser) parseLambdaOrGroupedExpression() ast.Expression {
+	if p.isLambdaSpeculation() {
+		return p.parseLambdaExpression()
+	}
+	return p.parseGroupedExpression()
+}
+
+func (p *Parser) isLambdaSpeculation() bool {
+	// Pattern: ( [params] ) =>
+	// We need to find the matching ')' and see if '=>' follows it.
+	
+	l := p.l.Clone()
+	// The lexer is currently at the position of the token AFTER peekToken.
+	// We need to account for peekToken.
+	
+	// If peekToken is ')', then check if the NEXT token is '=>'
+	if p.peekTokenIs(token.RPAREN) {
+		return l.NextToken().Type == token.LAMBDA_ARROW
+	}
+	
+	// If peekToken is an identifier (start of params), skip until we find ')'
+	if p.peekTokenIs(token.IDENT) {
+		for {
+			tok := l.NextToken()
+			if tok.Type == token.RPAREN {
+				return l.NextToken().Type == token.LAMBDA_ARROW
+			}
+			if tok.Type == token.EOF { return false }
+		}
+	}
+	
+	return false
+}
+
+func (p *Parser) parseLambdaExpression() ast.Expression {
+	// Don't call p.nextToken() here because parseFunctionParameters expects curToken to be '('
+	params := p.parseFunctionParameters()
+	
+	if !p.expectPeek(token.LAMBDA_ARROW) {
+		return nil
+	}
+	p.nextToken() // move to body
+	
+	lambda := &ast.LambdaExpression{Token: p.curToken, Parameters: params}
+	
+	if p.curTokenIs(token.LBRACE) {
+		lambda.Body = p.parseBlockStatement()
+	} else {
+		lambda.Body = p.parseExpression(LOWEST)
+	}
+	
+	return lambda
 }
 
 func (p *Parser) parseGroupedExpression() ast.Expression {
