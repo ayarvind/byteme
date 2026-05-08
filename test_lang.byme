@@ -1,0 +1,16 @@
+struct String{
+    let s: string;
+}
+
+fn (s: String) length() {
+    return len(s.s);
+}
+
+fn (s: String) toString(){
+    return s.s;
+}
+
+fn main() {
+    let s = String("hello");
+    println(s.toString());
+}

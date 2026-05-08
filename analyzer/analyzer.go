@@ -607,6 +607,10 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 			return "any"
 		}
 
+		if n.Operator == "+" && (leftType == "string" || rightType == "string") {
+			return "string"
+		}
+
 		if leftType != rightType && leftType != "any" && rightType != "any" {
 			a.error(n.Token, "type mismatch in expression: %s %s %s", leftType, n.Operator, rightType)
 			return "any"
