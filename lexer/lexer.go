@@ -64,12 +64,22 @@ func (l *Lexer) NextToken() token.Token {
 			tok = l.newToken(token.ASSIGN, l.ch)
 		}
 	case '+':
-		tok = l.newToken(token.PLUS, l.ch)
+		if l.peekChar() == '+' {
+			ch := l.ch
+			l.readChar()
+			tok = token.Token{Type: token.INC, Literal: string(ch) + string(l.ch), Line: startLine, Column: startColumn}
+		} else {
+			tok = l.newToken(token.PLUS, l.ch)
+		}
 	case '-':
 		if l.peekChar() == '>' {
 			ch := l.ch
 			l.readChar()
 			tok = token.Token{Type: token.ARROW, Literal: string(ch) + string(l.ch), Line: startLine, Column: startColumn}
+		} else if l.peekChar() == '-' {
+			ch := l.ch
+			l.readChar()
+			tok = token.Token{Type: token.DEC, Literal: string(ch) + string(l.ch), Line: startLine, Column: startColumn}
 		} else {
 			tok = l.newToken(token.MINUS, l.ch)
 		}

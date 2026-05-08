@@ -371,6 +371,18 @@ func (pe *PrefixExpression) String() string {
 	return "(" + pe.Operator + pe.Right.String() + ")"
 }
 
+type PostfixExpression struct {
+	Token    token.Token
+	Operator string
+	Left     Expression
+}
+func (pe *PostfixExpression) expressionNode()      {}
+func (pe *PostfixExpression) TokenLiteral() string { return pe.Token.Literal }
+func (pe *PostfixExpression) GetToken() token.Token { return pe.Token }
+func (pe *PostfixExpression) String() string {
+	return "(" + pe.Left.String() + pe.Operator + ")"
+}
+
 type InfixExpression struct {
 	Token    token.Token
 	Left     Expression

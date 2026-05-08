@@ -18,6 +18,7 @@ const (
 	SUM         // +
 	PRODUCT     // *
 	PREFIX      // -X or !X
+	POSTFIX     // X++
 	CALL        // myFunction(X)
 	INDEX       // array[index]
 	ACCESS      // foo.bar
@@ -44,6 +45,8 @@ var precedences = map[token.TokenType]int{
 	token.LPAREN:   CALL,
 	token.LBRACKET: INDEX,
 	token.DOT:      ACCESS,
+	token.INC:      POSTFIX,
+	token.DEC:      POSTFIX,
 }
 
 func (p *Parser) registerParsers() {
@@ -58,6 +61,8 @@ func (p *Parser) registerParsers() {
 	p.registerPrefix(token.BIT_NOT, p.parsePrefixExpression)
 	p.registerPrefix(token.TRUE, p.parseBoolean)
 	p.registerPrefix(token.FALSE, p.parseBoolean)
+	p.registerPrefix(token.INC, p.parsePrefixExpression)
+	p.registerPrefix(token.DEC, p.parsePrefixExpression)
 	p.registerPrefix(token.LPAREN, p.parseLambdaOrGroupedExpression)
 	p.registerPrefix(token.LBRACKET, p.parseArrayLiteral)
 	p.registerPrefix(token.IF, p.parseIfExpression)
@@ -89,6 +94,8 @@ func (p *Parser) registerParsers() {
 	p.registerInfix(token.LBRACKET, p.parseIndexExpression)
 	p.registerInfix(token.ASSIGN, p.parseInfixExpression) // Treat as infix
 	p.registerInfix(token.DOT, p.parseInfixExpression)
+	p.registerInfix(token.INC, p.parsePostfixExpression)
+	p.registerInfix(token.DEC, p.parsePostfixExpression)
 }
 
 func (p *Parser) parseArrayLiteral() ast.Expression {
@@ -784,6 +791,14 @@ func (p *Parser) parseInfixExpression(left ast.Expression) ast.Expression {
 	expression.Right = p.parseExpression(precedence)
 
 	return expression
+}
+
+func (p *Parser) parsePostfixExpression(left ast.Expression) ast.Expression {
+	return &ast.PostfixExpression{
+		Token:    p.curToken,
+		Operator: p.curToken.Literal,
+		Left:     left,
+	}
 }
 
 func (p *Parser) parseLambdaOrGroupedExpression() ast.Expression {

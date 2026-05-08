@@ -20,6 +20,8 @@ const (
 	BANG     TokenType = "!"
 	ASTERISK TokenType = "*"
 	SLASH    TokenType = "/"
+	INC      TokenType = "++"
+	DEC      TokenType = "--"
 
 	LT TokenType = "<"
 	GT TokenType = ">"

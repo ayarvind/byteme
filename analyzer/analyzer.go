@@ -644,7 +644,40 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 		}
 
 	case *ast.PrefixExpression:
-		return a.Analyze(n.Right)
+		rightType := a.Analyze(n.Right)
+		if n.Operator == "++" || n.Operator == "--" {
+			if rightType != "int" && rightType != "float" && rightType != "any" {
+				a.error(n.Token, "operator %s can only be applied to numeric types, got %s", n.Operator, rightType)
+			}
+			if !a.isAssignableNode(n.Right) {
+				a.error(n.Token, "operator %s must be applied to an assignable expression", n.Operator)
+			}
+			// Check for constant
+			if ident, ok := n.Right.(*ast.Identifier); ok {
+				if sym, ok := a.env.Get(ident.Value); ok && sym.IsConst {
+					a.error(n.Token, "cannot increment/decrement constant variable: %s", ident.Value)
+				}
+			}
+		}
+		return rightType
+
+	case *ast.PostfixExpression:
+		leftType := a.Analyze(n.Left)
+		if n.Operator == "++" || n.Operator == "--" {
+			if leftType != "int" && leftType != "float" && leftType != "any" {
+				a.error(n.Token, "operator %s can only be applied to numeric types, got %s", n.Operator, leftType)
+			}
+			if !a.isAssignableNode(n.Left) {
+				a.error(n.Token, "operator %s must be applied to an assignable expression", n.Operator)
+			}
+			// Check for constant
+			if ident, ok := n.Left.(*ast.Identifier); ok {
+				if sym, ok := a.env.Get(ident.Value); ok && sym.IsConst {
+					a.error(n.Token, "cannot increment/decrement constant variable: %s", ident.Value)
+				}
+			}
+		}
+		return leftType
 
 	case *ast.ExpressionStatement:
 		return a.Analyze(n.Expression)
@@ -1038,4 +1071,16 @@ func (a *Analyzer) AnalyzeLambdaExpression(n *ast.LambdaExpression) string {
 	}
 
 	return a.Analyze(n.Body)
+}
+
+func (a *Analyzer) isAssignableNode(node ast.Node) bool {
+	switch n := node.(type) {
+	case *ast.Identifier:
+		return true
+	case *ast.IndexExpression:
+		return true
+	case *ast.InfixExpression:
+		return n.Operator == "."
+	}
+	return false
 }

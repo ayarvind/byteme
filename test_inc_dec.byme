@@ -1,0 +1,36 @@
+println("--- Pre-increment/decrement ---");
+let x = 10;
+println("x: " + x);
+println("++x: " + ++x);
+println("x now: " + x);
+println("--x: " + --x);
+println("x now: " + x);
+
+println("\n--- Post-increment/decrement ---");
+let y = 20;
+println("y: " + y);
+println("y++: " + y++);
+println("y now: " + y);
+println("y--: " + y--);
+println("y now: " + y);
+
+println("\n--- Complex Targets ---");
+let arr = [1, 2, 3];
+println("arr[1]: " + arr[1]);
+println("++arr[1]: " + ++arr[1]);
+println("arr[1] now: " + arr[1]);
+
+struct Point { x: int }
+let p = Point(100);
+println("p.x: " + p.x);
+println("++p.x: " + ++p.x);
+println("p.x now: " + p.x);
+
+println("\n--- Post-increment in assignment ---");
+let a = [10, 20];
+let b = a[0]++;
+println("a[0] was 10, now is: " + a[0]);
+println("b should be 10, is: " + b);
+let c = --a[0];
+println("a[0] was 11, now is: " + a[0]);
+println("c should be 10, is: " + c);

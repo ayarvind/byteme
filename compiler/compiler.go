@@ -354,6 +354,56 @@ func (c *Compiler) Compile(node ast.Node) error {
 		}
 
 	case *ast.PrefixExpression:
+		if n.Operator == "++" || n.Operator == "--" {
+			switch target := n.Right.(type) {
+			case *ast.Identifier:
+				sym, _ := c.symbolTable.Resolve(target.Value)
+				c.loadSymbol(sym)
+				c.emit(code.OpConstant, c.addConstant(&object.Integer{Value: 1}))
+				if n.Operator == "++" { c.emit(code.OpAdd) } else { c.emit(code.OpSub) }
+				c.emit(code.OpDup)
+				c.storeSymbol(sym)
+				return nil
+			case *ast.IndexExpression:
+				err := c.Compile(target.Left)
+				if err != nil { return err }
+				err = c.Compile(target.Index)
+				if err != nil { return err }
+				c.emit(code.OpDup2)
+				c.emit(code.OpIndex)
+				c.emit(code.OpConstant, c.addConstant(&object.Integer{Value: 1}))
+				if n.Operator == "++" { c.emit(code.OpAdd) } else { c.emit(code.OpSub) }
+				// [arr, idx, new_val]
+				c.emit(code.OpPick, 2) // [arr, idx, new_val, arr]
+				c.emit(code.OpPick, 2) // [arr, idx, new_val, arr, idx]
+				c.emit(code.OpPick, 2) // [arr, idx, new_val, arr, idx, new_val]
+				c.emit(code.OpSetIndex) // [arr, idx, new_val, arr]
+				c.emit(code.OpPop)      // [arr, idx, new_val]
+				c.emit(code.OpRot)      // [new_val, arr, idx]
+				c.emit(code.OpPop)      // [new_val, arr]
+				c.emit(code.OpPop)      // [new_val]
+				return nil
+			case *ast.InfixExpression: // Dot access
+				if target.Operator == "." {
+					ident := target.Right.(*ast.Identifier)
+					err := c.Compile(target.Left)
+					if err != nil { return err }
+					c.emit(code.OpDup)
+					fieldNameIdx := c.addConstant(&object.String{Value: ident.Value})
+					c.emit(code.OpGetField, fieldNameIdx)
+					c.emit(code.OpConstant, c.addConstant(&object.Integer{Value: 1}))
+					if n.Operator == "++" { c.emit(code.OpAdd) } else { c.emit(code.OpSub) }
+					// [inst, new_val]
+					c.emit(code.OpDup2) // [inst, new_val, inst, new_val]
+					c.emit(code.OpSetField, fieldNameIdx) // [inst, new_val, inst]
+					c.emit(code.OpPop)   // [inst, new_val]
+					c.emit(code.OpSwap)  // [new_val, inst]
+					c.emit(code.OpPop)   // [new_val]
+					return nil
+				}
+			}
+		}
+
 		err := c.Compile(n.Right)
 		if err != nil {
 			return err
@@ -367,6 +417,64 @@ func (c *Compiler) Compile(node ast.Node) error {
 			c.emit(code.OpBitNot)
 		default:
 			return fmt.Errorf("unknown operator %s", n.Operator)
+		}
+
+	case *ast.PostfixExpression:
+		if n.Operator == "++" || n.Operator == "--" {
+			switch target := n.Left.(type) {
+			case *ast.Identifier:
+				sym, _ := c.symbolTable.Resolve(target.Value)
+				c.loadSymbol(sym)
+				c.emit(code.OpDup)
+				c.emit(code.OpConstant, c.addConstant(&object.Integer{Value: 1}))
+				if n.Operator == "++" { c.emit(code.OpAdd) } else { c.emit(code.OpSub) }
+				c.storeSymbol(sym)
+				return nil
+			case *ast.IndexExpression:
+				err := c.Compile(target.Left)
+				if err != nil { return err }
+				err = c.Compile(target.Index)
+				if err != nil { return err }
+				c.emit(code.OpDup2)
+				c.emit(code.OpIndex)
+				// [arr, idx, old_val]
+				c.emit(code.OpDup) 
+				c.emit(code.OpConstant, c.addConstant(&object.Integer{Value: 1}))
+				if n.Operator == "++" { c.emit(code.OpAdd) } else { c.emit(code.OpSub) }
+				// [arr, idx, old_val, new_val]
+				c.emit(code.OpPick, 3) // [..., arr]
+				c.emit(code.OpPick, 3) // [..., idx]
+				c.emit(code.OpPick, 2) // [..., new_val]
+				c.emit(code.OpSetIndex) // [arr, idx, old_val, new_val, arr]
+				c.emit(code.OpPop)      // [arr, idx, old_val, new_val]
+				c.emit(code.OpPop)      // [arr, idx, old_val]
+				c.emit(code.OpRot)      // [old_val, arr, idx]
+				c.emit(code.OpPop)      // [old_val, arr]
+				c.emit(code.OpPop)      // [old_val]
+				return nil
+			case *ast.InfixExpression: // Dot access
+				if target.Operator == "." {
+					ident := target.Right.(*ast.Identifier)
+					err := c.Compile(target.Left)
+					if err != nil { return err }
+					c.emit(code.OpDup)
+					fieldNameIdx := c.addConstant(&object.String{Value: ident.Value})
+					c.emit(code.OpGetField, fieldNameIdx)
+					// [inst, old_val]
+					c.emit(code.OpDup)
+					c.emit(code.OpConstant, c.addConstant(&object.Integer{Value: 1}))
+					if n.Operator == "++" { c.emit(code.OpAdd) } else { c.emit(code.OpSub) }
+					// [inst, old_val, new_val]
+					c.emit(code.OpPick, 2) // [..., inst]
+					c.emit(code.OpPick, 1) // [..., new_val]
+					c.emit(code.OpSetField, fieldNameIdx) // [inst, old_val, new_val, inst]
+					c.emit(code.OpPop)    // [inst, old_val, new_val]
+					c.emit(code.OpPop)    // [inst, old_val]
+					c.emit(code.OpSwap)   // [old_val, inst]
+					c.emit(code.OpPop)    // [old_val]
+					return nil
+				}
+			}
 		}
 
 	case *ast.IntegerLiteral:
@@ -1118,6 +1226,17 @@ func (c *Compiler) loadSymbol(s Symbol) {
 		c.emit(code.OpGetBuiltin, s.Index)
 	case FreeScope:
 		c.emit(code.OpGetFree, s.Index)
+	}
+}
+
+func (c *Compiler) storeSymbol(s Symbol) {
+	switch s.Scope {
+	case GlobalScope:
+		c.emit(code.OpSetGlobal, s.Index)
+	case LocalScope:
+		c.emit(code.OpSetLocal, s.Index)
+	case FreeScope:
+		c.emit(code.OpSetFree, s.Index)
 	}
 }
 

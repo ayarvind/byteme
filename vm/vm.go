@@ -594,6 +594,19 @@ func (vm *VM) Run() error {
 
 		case code.OpDup:
 			vm.push(vm.stack[vm.sp-1])
+		case code.OpDup2:
+			vm.push(vm.stack[vm.sp-2])
+			vm.push(vm.stack[vm.sp-2])
+		case code.OpSwap:
+			vm.stack[vm.sp-1], vm.stack[vm.sp-2] = vm.stack[vm.sp-2], vm.stack[vm.sp-1]
+		case code.OpRot:
+			// A, B, C -> C, A, B
+			a, b, c := vm.stack[vm.sp-3], vm.stack[vm.sp-2], vm.stack[vm.sp-1]
+			vm.stack[vm.sp-3], vm.stack[vm.sp-2], vm.stack[vm.sp-1] = c, a, b
+		case code.OpPick:
+			n := int(ins[ip+1])
+			vm.currentFrame().ip += 1
+			vm.push(vm.stack[vm.sp-1-n])
 		}
 	}
 	return nil

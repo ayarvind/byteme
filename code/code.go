@@ -64,6 +64,10 @@ const (
 	OpYield
 	OpMap        // operand: 2-byte number of key-value pairs
 	OpDup        // duplicate the top value on the stack
+	OpDup2       // duplicate the top two values on the stack
+	OpSwap       // swap the top two values on the stack
+	OpRot        // rotate the top three values on the stack (A, B, C -> C, A, B)
+	OpPick       // operand: 1-byte index from top (0 is top). Push stack[sp-1-n]
 )
 
 type Definition struct {
@@ -125,6 +129,10 @@ var definitions = map[Opcode]*Definition{
 	OpYield:         {"OpYield", []int{}},
 	OpMap:           {"OpMap", []int{2}},
 	OpDup:           {"OpDup", []int{}},
+	OpDup2:          {"OpDup2", []int{}},
+	OpSwap:          {"OpSwap", []int{}},
+	OpRot:           {"OpRot", []int{}},
+	OpPick:          {"OpPick", []int{1}},
 }
 
 func Lookup(op byte) (*Definition, error) {
