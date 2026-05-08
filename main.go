@@ -33,6 +33,7 @@ func main() {
 	compileOnly := flag.Bool("c", false, "compile only, do not run")
 	useEvaluator := flag.Bool("eval", false, "use the tree-walk evaluator instead of VM")
 	disassemble := flag.Bool("d", false, "disassemble bytecode")
+	lintOnly := flag.Bool("lint", false, "lint only (lexer, parser, and semantic analysis)")
 	flag.Parse()
 
 	if len(flag.Args()) < 1 {
@@ -71,6 +72,11 @@ func main() {
 	// 4. Optimization
 	opt := optimizer.New()
 	optimized := opt.Optimize(program).(*ast.Program)
+
+	if *lintOnly {
+		fmt.Println("No lint errors found.")
+		return
+	}
 
 	if *disassemble {
 		comp := compiler.New()

@@ -760,8 +760,10 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 
 	case *ast.CallExpression:
 		a.Analyze(n.Function)
-		for _, arg := range n.Arguments {
-			a.Analyze(arg)
+		
+		argTypes := make([]string, len(n.Arguments))
+		for i, arg := range n.Arguments {
+			argTypes[i] = a.Analyze(arg)
 		}
 		
 		if ident, ok := n.Function.(*ast.Identifier); ok {
@@ -771,9 +773,9 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 					a.error(n.Token, "wrong number of arguments for %s: expected %d, got %d", ident.Value, len(sig.Params), len(n.Arguments))
 				} else {
 					// Check argument types
-					for i, arg := range n.Arguments {
+					for i := range n.Arguments {
 						if i >= len(sig.Params) { break }
-						argType := a.Analyze(arg)
+						argType := argTypes[i]
 						expectedType := strings.ReplaceAll(sig.Params[i], "::", ".")
 						if expectedType != "any" && argType != "any" && !a.isAssignable(expectedType, argType) {
 							a.error(n.Token, "type mismatch for argument %d of %s: expected %s, got %s", i+1, ident.Value, expectedType, argType)
@@ -833,8 +835,8 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 						if len(n.Arguments) != len(sig.Params) {
 							a.error(n.Token, "wrong number of arguments for method %s: expected %d, got %d", rightIdent.Value, len(sig.Params), len(n.Arguments))
 						} else {
-							for i, arg := range n.Arguments {
-								argType := a.Analyze(arg)
+							for i := range n.Arguments {
+								argType := argTypes[i]
 								expectedType := strings.ReplaceAll(sig.Params[i], "::", ".")
 								if expectedType != "any" && argType != "any" && !a.isAssignable(expectedType, argType) {
 									a.error(n.Token, "type mismatch for argument %d of method %s: expected %s, got %s", i+1, rightIdent.Value, expectedType, argType)
