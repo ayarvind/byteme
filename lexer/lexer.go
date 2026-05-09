@@ -2,6 +2,7 @@ package lexer
 
 import (
 	"github.com/byteme/compiler/token"
+	"strings"
 )
 
 type Lexer struct {
@@ -11,6 +12,7 @@ type Lexer struct {
 	ch           byte // current char under examination
 	line         int
 	column       int
+	LastComment  string
 }
 
 func New(input string) *Lexer {
@@ -63,6 +65,11 @@ func (l *Lexer) NextToken() token.Token {
 		} else {
 			tok = l.newToken(token.ASSIGN, l.ch)
 		}
+	case '"':
+		tok.Type = token.STRING
+		tok.Literal = l.readString()
+		tok.Line = startLine
+		tok.Column = startColumn
 	case '+':
 		if l.peekChar() == '+' {
 			ch := l.ch
@@ -198,9 +205,9 @@ func (l *Lexer) NextToken() token.Token {
 		tok.Line = startLine
 		tok.Column = startColumn
 		return tok
-	case '"':
-		tok.Type = token.STRING
-		tok.Literal = l.readString()
+	case '`':
+		tok.Type = token.TEMPLATE_STRING
+		tok.Literal = l.readTemplateString()
 		tok.Line = startLine
 		tok.Column = startColumn
 	case 0:
@@ -236,9 +243,12 @@ func (l *Lexer) skipWhitespace() {
 }
 
 func (l *Lexer) skipComment() {
+	start := l.position
 	for l.ch != '\n' && l.ch != 0 {
 		l.readChar()
 	}
+	comment := l.input[start:l.position]
+	l.LastComment = strings.TrimSpace(strings.TrimPrefix(comment, "//"))
 	l.skipWhitespace()
 }
 
@@ -279,6 +289,28 @@ func (l *Lexer) readString() string {
 			case 'n': out = append(out, '\n')
 			case 't': out = append(out, '\t')
 			case '"': out = append(out, '"')
+			case '\\': out = append(out, '\\')
+			default: out = append(out, rune(l.ch))
+			}
+		} else {
+			out = append(out, rune(l.ch))
+		}
+		l.readChar()
+	}
+	return string(out)
+}
+
+func (l *Lexer) readTemplateString() string {
+	var out []rune
+	l.readChar() // skip opening `
+	
+	for l.ch != '`' && l.ch != 0 {
+		if l.ch == '\\' {
+			l.readChar()
+			switch l.ch {
+			case 'n': out = append(out, '\n')
+			case 't': out = append(out, '\t')
+			case '`': out = append(out, '`')
 			case '\\': out = append(out, '\\')
 			default: out = append(out, rune(l.ch))
 			}

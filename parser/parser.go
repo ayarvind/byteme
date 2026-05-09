@@ -7,6 +7,7 @@ import (
 	"github.com/byteme/compiler/ast"
 	"github.com/byteme/compiler/lexer"
 	"github.com/byteme/compiler/token"
+	"strings"
 )
 
 const (
@@ -67,6 +68,7 @@ func (p *Parser) registerParsers() {
 	p.registerPrefix(token.INT, p.parseIntegerLiteral)
 	p.registerPrefix(token.FLOAT, p.parseFloatLiteral)
 	p.registerPrefix(token.STRING, p.parseStringLiteral)
+	p.registerPrefix(token.TEMPLATE_STRING, p.parseTemplateStringLiteral)
 	p.registerPrefix(token.CHAR, p.parseCharLiteral)
 	p.registerPrefix(token.BANG, p.parsePrefixExpression)
 	p.registerPrefix(token.MINUS, p.parsePrefixExpression)
@@ -171,6 +173,15 @@ func New(l *lexer.Lexer) *Parser {
 func (p *Parser) nextToken() {
 	p.curToken = p.peekToken
 	p.peekToken = p.l.NextToken()
+	if p.peekToken.Type == token.ILLEGAL {
+		fmt.Printf("DEBUG: Found ILLEGAL token: '%s' at %d:%d\n", p.peekToken.Literal, p.peekToken.Line, p.peekToken.Column)
+	}
+}
+
+func (p *Parser) consumeDocstring() string {
+	doc := p.l.LastComment
+	p.l.LastComment = ""
+	return doc
 }
 
 func (p *Parser) Errors() []string {
@@ -511,6 +522,7 @@ func (p *Parser) parseInterfaceStatement() *ast.InterfaceStatement {
 				p.nextToken()
 				sig.ReturnType = p.curToken.Literal
 			}
+			sig.Docstring = p.consumeDocstring()
 			stmt.Methods = append(stmt.Methods, sig)
 			if p.peekTokenIs(token.SEMICOLON) {
 				p.nextToken()
@@ -795,6 +807,59 @@ func (p *Parser) parseStringLiteral() ast.Expression {
 	return &ast.StringLiteral{Token: p.curToken, Value: p.curToken.Literal}
 }
 
+func (p *Parser) parseTemplateStringLiteral() ast.Expression {
+	lit := &ast.TemplateStringLiteral{Token: p.curToken}
+	
+	val := p.curToken.Literal
+	parts := []ast.Expression{}
+	
+	i := 0
+	for i < len(val) {
+		loc := strings.Index(val[i:], "${")
+		if loc == -1 {
+			// No more interpolations
+			parts = append(parts, &ast.StringLiteral{Value: val[i:]})
+			break
+		}
+		
+		// Add the string part before ${
+		if loc > 0 {
+			parts = append(parts, &ast.StringLiteral{Value: val[i : i+loc]})
+		}
+		
+		i += loc + 2 // Skip ${
+		
+		// Find closing }
+		// This is a simple parser, so we just find the next }
+		// In a real one, we'd handle nested braces.
+		end := strings.Index(val[i:], "}")
+		if end == -1 {
+			// Error: unclosed interpolation
+			break
+		}
+		
+		exprStr := val[i : i+end]
+		// Parse the expression string!
+		// We create a new parser for the inner expression.
+		innerL := lexer.New(exprStr)
+		innerP := New(innerL)
+		expr := innerP.parseExpression(LOWEST)
+		if len(innerP.errors) > 0 {
+			for _, err := range innerP.errors {
+				p.errors = append(p.errors, "Template error: "+err)
+			}
+		}
+		if expr != nil {
+			parts = append(parts, expr)
+		}
+		
+		i += end + 1 // Skip }
+	}
+	
+	lit.Parts = parts
+	return lit
+}
+
 func (p *Parser) parseBoolean() ast.Expression {
 	return &ast.BooleanLiteral{Token: p.curToken, Value: p.curTokenIs(token.TRUE)}
 }
@@ -997,6 +1062,7 @@ func (p *Parser) parseAsyncFunctionLiteral() ast.Expression {
 
 func (p *Parser) parseFunctionLiteral() ast.Expression {
 	lit := &ast.FunctionLiteral{Token: p.curToken}
+	lit.Docstring = p.consumeDocstring()
 
 	// 1. Optional Name
 	if p.peekTokenIs(token.IDENT) {

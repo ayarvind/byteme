@@ -144,6 +144,9 @@ func main() {
 
 		if bestSym != nil {
 			fmt.Printf("Type: %s\n", bestSym.Type)
+			if bestSym.Docstring != "" {
+				fmt.Printf("\n%s\n", bestSym.Docstring)
+			}
 			if bestSym.IsConst {
 				fmt.Println("Constant")
 			}

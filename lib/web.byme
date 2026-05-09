@@ -38,6 +38,26 @@ fn (u: WebUtility) redirect(url) {
     return res;
 }
 
+// Parses URL-encoded form data (e.g. key1=val1&key2=val2)
+fn (u: WebUtility) parseForm(body) {
+    let result = map();
+    if (body == "") { return result; }
+    
+    let pairs = strSplit(body, "&");
+    let i = 0;
+    while (i < len(pairs)) {
+        let pair = pairs[i];
+        let kv = strSplit(pair, "=");
+        if (len(kv) == 2) {
+            // Basic unescape: + to space
+            let val = strReplace(kv[1], "+", " ", -1);
+            mapSet(result, kv[0], val);
+        }
+        i = i + 1;
+    }
+    return result;
+}
+
 // Router helper
 struct App {
     port: int

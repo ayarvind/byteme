@@ -9,6 +9,7 @@ import (
 	"github.com/byteme/compiler/lexer"
 	"github.com/byteme/compiler/parser"
 	"github.com/byteme/compiler/token"
+	"path/filepath"
 	"strings"
 )
  
@@ -35,138 +36,138 @@ type Analyzer struct {
 
 func New(env *environment.Environment, source string, filename string) *Analyzer {
 	// Register basic types as symbols
-	env.Set("int", "type", environment.PUBLIC, true, "", 0, 0)
-	env.Set("float", "type", environment.PUBLIC, true, "", 0, 0)
-	env.Set("string", "type", environment.PUBLIC, true, "", 0, 0)
-	env.Set("char", "type", environment.PUBLIC, true, "", 0, 0)
-	env.Set("bool", "type", environment.PUBLIC, true, "", 0, 0)
-	env.Set("any", "type", environment.PUBLIC, true, "", 0, 0)
-	env.Set("array", "type", environment.PUBLIC, true, "", 0, 0)
-	env.Set("map", "type", environment.PUBLIC, true, "", 0, 0)
-	env.Set("void", "type", environment.PUBLIC, true, "", 0, 0)
+	env.Set("int", "type", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("float", "type", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("string", "type", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("char", "type", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("bool", "type", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("any", "type", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("array", "type", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("map", "type", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("void", "type", environment.PUBLIC, true, "", 0, 0, "")
 
 	// Register global built-ins
-	env.Set("chan", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("send", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("recv", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("println", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("null", "any", environment.PUBLIC, true, "", 0, 0)
-	env.Set("arrayLen", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("arrayPush", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("arrayPop", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("arrayShift", "function", environment.PUBLIC, true, "", 0, 0)
-	// env.Set("map", "function", environment.PUBLIC, true, "", 0, 0) // Collides with map type
-	env.Set("mapSet", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("mapGet", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("mapHas", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("charAt", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("arraySlice", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("arraySort", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("mapDelete", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("mapKeys", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("mapValues", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("timeParse", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("strReplaceAll", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("timeAdd", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("timeSub", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("timeDiff", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("timeInLocation", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("ioReadInput", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("fileRead", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("fileWrite", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("fileAppend", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("fileExists", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("jsonParse", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("jsonStringify", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("timeNow", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("timeSleep", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("timeFormat", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("nativeCall", "function", environment.PUBLIC, true, "", 0, 0)
+	env.Set("chan", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("send", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("recv", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("println", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("null", "any", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("arrayLen", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("arrayPush", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("arrayPop", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("arrayShift", "function", environment.PUBLIC, true, "", 0, 0, "")
+	// env.Set("map", "function", environment.PUBLIC, true, "", 0, 0, "") // Collides with map type
+	env.Set("mapSet", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("mapGet", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("mapHas", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("charAt", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("arraySlice", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("arraySort", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("mapDelete", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("mapKeys", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("mapValues", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("timeParse", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("strReplaceAll", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("timeAdd", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("timeSub", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("timeDiff", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("timeInLocation", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("ioReadInput", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("fileRead", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("fileWrite", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("fileAppend", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("fileExists", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("jsonParse", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("jsonStringify", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("timeNow", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("timeSleep", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("timeFormat", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("nativeCall", "function", environment.PUBLIC, true, "", 0, 0, "")
 	// HTTP / networking module
-	env.Set("httpHandle",   "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("httpServe",    "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("httpGet",      "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("httpPost",     "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("httpResponse", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("httpDo",       "function", environment.PUBLIC, true, "", 0, 0)
+	env.Set("httpHandle",   "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("httpServe",    "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("httpGet",      "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("httpPost",     "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("httpResponse", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("httpDo",       "function", environment.PUBLIC, true, "", 0, 0, "")
 	
-	env.Set("toInt",        "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("toFloat",      "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("toChar",       "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("toString",     "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("typeof",       "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("len",          "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("envGet",       "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("envSet",       "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("args",         "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("exit",         "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("sha256",       "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("md5",          "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("regexMatch",   "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("regexReplace", "function", environment.PUBLIC, true, "", 0, 0)
+	env.Set("toInt",        "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("toFloat",      "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("toChar",       "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("toString",     "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("typeof",       "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("len",          "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("envGet",       "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("envSet",       "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("args",         "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("exit",         "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("sha256",       "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("md5",          "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("regexMatch",   "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("regexReplace", "function", environment.PUBLIC, true, "", 0, 0, "")
 	
 	// Math Built-ins
-	env.Set("mathSin", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("mathCos", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("mathTan", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("mathSqrt", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("mathPow", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("mathLog", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("mathLog10", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("mathExp", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("mathAsin", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("mathAcos", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("mathAtan", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("mathAtan2", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("mathAbs", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("mathCeil", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("mathFloor", "function", environment.PUBLIC, true, "", 0, 0)
+	env.Set("mathSin", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("mathCos", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("mathTan", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("mathSqrt", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("mathPow", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("mathLog", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("mathLog10", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("mathExp", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("mathAsin", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("mathAcos", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("mathAtan", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("mathAtan2", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("mathAbs", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("mathCeil", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("mathFloor", "function", environment.PUBLIC, true, "", 0, 0, "")
 
 	// String Built-ins
-	env.Set("strToLower", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("strToUpper", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("strTrim", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("strTrimSpace", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("strSplit", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("strJoin", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("strContains", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("strHasPrefix", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("strHasSuffix", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("strIndex", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("strLastIndex", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("strReplace", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("strRepeat", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("strCount", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("strFields", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("strTrimLeft", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("strTrimRight", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("strIsAlpha", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("strIsDigit", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("strIsSpace", "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("strReverse", "function", environment.PUBLIC, true, "", 0, 0)
+	env.Set("strToLower", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("strToUpper", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("strTrim", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("strTrimSpace", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("strSplit", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("strJoin", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("strContains", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("strHasPrefix", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("strHasSuffix", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("strIndex", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("strLastIndex", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("strReplace", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("strRepeat", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("strCount", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("strFields", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("strTrimLeft", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("strTrimRight", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("strIsAlpha", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("strIsDigit", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("strIsSpace", "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("strReverse", "function", environment.PUBLIC, true, "", 0, 0, "")
 	
-	env.Set("osMkdir",       "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("osRmdir",       "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("osRemove",      "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("osRename",      "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("osListdir",     "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("osExists",      "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("osIsdir",       "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("osIsfile",      "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("osGetcwd",      "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("osChdir",       "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("osGetpid",      "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("pathJoin",      "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("pathBase",      "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("pathDir",       "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("fOpen",         "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("fClose",        "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("fRead",         "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("fWrite",        "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("fSeek",         "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("instanceOf",    "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("generator",     "function", environment.PUBLIC, true, "", 0, 0)
-	env.Set("mathRand",      "function", environment.PUBLIC, true, "", 0, 0)
+	env.Set("osMkdir",       "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("osRmdir",       "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("osRemove",      "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("osRename",      "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("osListdir",     "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("osExists",      "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("osIsdir",       "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("osIsfile",      "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("osGetcwd",      "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("osChdir",       "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("osGetpid",      "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("pathJoin",      "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("pathBase",      "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("pathDir",       "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("fOpen",         "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("fClose",        "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("fRead",         "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("fWrite",        "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("fSeek",         "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("instanceOf",    "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("generator",     "function", environment.PUBLIC, true, "", 0, 0, "")
+	env.Set("mathRand",      "function", environment.PUBLIC, true, "", 0, 0, "")
 
 	a := &Analyzer{
 		env:               env,
@@ -179,10 +180,17 @@ func New(env *environment.Environment, source string, filename string) *Analyzer
 		funcSignatures:    make(map[string]FunctionSignature),
 		builtinSignatures: make(map[string]FunctionSignature),
 		source:            source,
-		filename:          strings.ToLower(strings.ReplaceAll(filename, "\\", "/")),
-		lines:             strings.Split(source, "\n"),
-		ResolvedSymbols:   make(map[string]environment.Symbol),
 	}
+	
+	absPath, err := filepath.Abs(filename)
+	if err == nil {
+		a.filename = strings.ToLower(strings.ReplaceAll(absPath, "\\", "/"))
+	} else {
+		a.filename = strings.ToLower(strings.ReplaceAll(filename, "\\", "/"))
+	}
+
+	a.lines = strings.Split(source, "\n")
+	a.ResolvedSymbols = make(map[string]environment.Symbol)
 	
 	// Register built-in signatures
 	a.builtinSignatures["len"] = FunctionSignature{Params: []string{"any"}, Return: "int"}
@@ -478,20 +486,54 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 			a.env = environment.NewEnclosedEnvironment(savedEnv)
 		}
 		
-		// Analyze the imported program
+		// Analyze the imported program with its own filename context
+		oldFilename := a.filename
+		
+		absPath, err := filepath.Abs(filename)
+		var normalizedPath string
+		if err == nil {
+			normalizedPath = strings.ToLower(strings.ReplaceAll(absPath, "\\", "/"))
+		} else {
+			normalizedPath = strings.ToLower(strings.ReplaceAll(filename, "\\", "/"))
+		}
+
+		a.filename = normalizedPath
 		a.Analyze(program)
+		a.filename = oldFilename
+
+		// Record the import path itself for navigation
+		ikey := fmt.Sprintf("%s:%d:%d", a.filename, n.Path.Token.Line, n.Path.Token.Column)
+		a.ResolvedSymbols[ikey] = environment.Symbol{
+			Name:     filename,
+			Type:     "module",
+			Filename: normalizedPath,
+			Line:     1,
+			Column:   1,
+		}
 
 		if n.Token.Type == token.FROM {
 			// Extract specific imports
 			for _, imp := range n.Imports {
-				a.env.Set(imp.Value, "any", environment.PUBLIC, false, a.filename, imp.Token.Line, imp.Token.Column)
-			}
-			a.env = savedEnv
-			for _, imp := range n.Imports {
-				a.env.Set(imp.Value, "any", environment.PUBLIC, false, a.filename, imp.Token.Line, imp.Token.Column)
+				// Record usage of the imported symbol in the 'from' list
+				// Its definition is whatever was just analyzed in the module
+				if sym, ok := a.env.Get(imp.Value); ok {
+					ukey := fmt.Sprintf("%s:%d:%d", a.filename, imp.Token.Line, imp.Token.Column)
+					a.ResolvedSymbols[ukey] = sym
+				}
+				a.env.Set(imp.Value, "any", environment.PUBLIC, false, a.filename, imp.Token.Line, imp.Token.Column, "")
 			}
 		} else if n.Name != nil {
-			a.env.Set(n.Name.Value, "map", environment.PUBLIC, false, a.filename, n.Name.Token.Line, n.Name.Token.Column)
+			a.env.Set(n.Name.Value, "map", environment.PUBLIC, false, a.filename, n.Name.Token.Line, n.Name.Token.Column, "")
+			// Record the alias definition
+			akey := fmt.Sprintf("%s:%d:%d", a.filename, n.Name.Token.Line, n.Name.Token.Column)
+			a.ResolvedSymbols[akey] = environment.Symbol{
+				Name:     n.Name.Value,
+				Type:     "module",
+				Filename: a.filename,
+				Line:     n.Name.Token.Line,
+				Column:   n.Name.Token.Column,
+				Docstring: "",
+			}
 		}
 
 	case *ast.LetStatement:
@@ -528,13 +570,13 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 				a.error(n.Token, "type mismatch: cannot assign %s to %s", valType, typeName)
 			}
 		}
-		err := a.env.Set(n.Name.Value, typeName, environment.PUBLIC, false, a.filename, n.Name.Token.Line, n.Name.Token.Column)
+		err := a.env.Set(n.Name.Value, typeName, environment.PUBLIC, false, a.filename, n.Name.Token.Line, n.Name.Token.Column, "")
 		if err != nil {
 			a.error(n.Name.Token, "%s", err.Error())
 		}
 		// Record definition
 		key := fmt.Sprintf("%s:%d:%d", a.filename, n.Name.Token.Line, n.Name.Token.Column)
-		a.ResolvedSymbols[key] = environment.Symbol{Name: n.Name.Value, Type: typeName, Filename: a.filename, Line: n.Name.Token.Line, Column: n.Name.Token.Column}
+		a.ResolvedSymbols[key] = environment.Symbol{Name: n.Name.Value, Type: typeName, Filename: a.filename, Line: n.Name.Token.Line, Column: n.Name.Token.Column, Docstring: ""}
 		return typeName
 
 	case *ast.ConstStatement:
@@ -555,7 +597,7 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 		} else if !a.isAssignable(typeName, valType) {
 			a.error(n.Token, "type mismatch: cannot assign %s to constant of type %s", valType, typeName)
 		}
-		err := a.env.Set(n.Name.Value, typeName, environment.PUBLIC, true, a.filename, n.Name.Token.Line, n.Name.Token.Column)
+		err := a.env.Set(n.Name.Value, typeName, environment.PUBLIC, true, a.filename, n.Name.Token.Line, n.Name.Token.Column, "")
 		if err != nil {
 			a.error(n.Name.Token, "%s", err.Error())
 		}
@@ -599,6 +641,12 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 	case *ast.StringLiteral:
 		return "string"
 
+	case *ast.TemplateStringLiteral:
+		for _, part := range n.Parts {
+			a.Analyze(part)
+		}
+		return "string"
+
 	case *ast.CharLiteral:
 		return "char"
 
@@ -623,6 +671,8 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 
 				// Check fields
 				if fieldType, ok := a.lookupField(leftType, rightIdent.Value); ok {
+					// Record field usage? We don't have a symbol for fields easily, 
+					// but we can try to find the struct definition.
 					return fieldType
 				}
 				// Check methods
@@ -630,13 +680,27 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 					return "function"
 				}
 
-				if leftType != "any" && !strings.Contains(leftType, "|") {
-					a.error(n.Token, "type %s has no field or method %s", leftType, rightIdent.Value)
-				} else if strings.Contains(leftType, "|") {
-					// Return any but don't error for now to allow flexible union usage
-					return "any"
+				// Handle module symbols (if left is an alias)
+				if leftType == "module" || leftType == "map" {
+					if leftIdent, ok := n.Left.(*ast.Identifier); ok {
+						compoundKey := leftIdent.Value + "." + rightIdent.Value
+						if sym, ok := a.env.Get(compoundKey); ok {
+							ukey := fmt.Sprintf("%s:%d:%d", a.filename, rightIdent.Token.Line, rightIdent.Token.Column)
+							a.ResolvedSymbols[ukey] = sym
+							return sym.Type
+						}
+					}
+					// Fallback: maybe it's just a global name imported from that module
+					if sym, ok := a.env.Get(rightIdent.Value); ok {
+						ukey := fmt.Sprintf("%s:%d:%d", a.filename, rightIdent.Token.Line, rightIdent.Token.Column)
+						a.ResolvedSymbols[ukey] = sym
+						return sym.Type
+					}
 				}
-				return "any"
+
+				if leftType != "any" && !strings.Contains(leftType, "|") && leftType != "module" && leftType != "map" {
+					a.error(n.Token, "type %s has no field or method %s", leftType, rightIdent.Value)
+				}
 			}
 			return "any"
 		}
@@ -771,7 +835,7 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 									}
 								}
 							}
-							narrowedEnv.Set(targetIdent.Value, typeName, environment.PUBLIC, false, a.filename, targetIdent.Token.Line, targetIdent.Token.Column)
+							narrowedEnv.Set(targetIdent.Value, typeName, environment.PUBLIC, false, a.filename, targetIdent.Token.Line, targetIdent.Token.Column, "")
 						}
 					}
 				}
@@ -809,16 +873,16 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 		// Register parameters
 		for _, p := range n.Parameters {
 			pType := strings.ReplaceAll(p.Type, "::", ".")
-			a.env.Set(p.Name.Value, pType, environment.PUBLIC, false, a.filename, p.Name.Token.Line, p.Name.Token.Column)
+			a.env.Set(p.Name.Value, pType, environment.PUBLIC, false, a.filename, p.Name.Token.Line, p.Name.Token.Column, "")
 			// Record definition
 			key := fmt.Sprintf("%s:%d:%d", a.filename, p.Name.Token.Line, p.Name.Token.Column)
-			a.ResolvedSymbols[key] = environment.Symbol{Name: p.Name.Value, Type: pType, Filename: a.filename, Line: p.Name.Token.Line, Column: p.Name.Token.Column}
+			a.ResolvedSymbols[key] = environment.Symbol{Name: p.Name.Value, Type: pType, Filename: a.filename, Line: p.Name.Token.Line, Column: p.Name.Token.Column, Docstring: ""}
 		}
 
 		// Handle receiver for methods
 		if n.Receiver != nil {
 			recType := strings.ReplaceAll(n.Receiver.Type, "::", ".")
-			a.env.Set(n.Receiver.Name.Value, recType, environment.PUBLIC, false, a.filename, n.Receiver.Name.Token.Line, n.Receiver.Name.Token.Column)
+			a.env.Set(n.Receiver.Name.Value, recType, environment.PUBLIC, false, a.filename, n.Receiver.Name.Token.Line, n.Receiver.Name.Token.Column, "")
 		}
 
 		a.Analyze(n.Body)
@@ -859,7 +923,7 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 
 
 	case *ast.StructLiteral:
-		a.env.Set(n.Name.Value, "type", environment.PUBLIC, true, a.filename, n.Name.Token.Line, n.Name.Token.Column)
+		a.env.Set(n.Name.Value, "type", environment.PUBLIC, true, a.filename, n.Name.Token.Line, n.Name.Token.Column, "")
 		if n.Parent != nil {
 			a.structParents[n.Name.Value] = n.Parent.Value
 		}
@@ -998,7 +1062,7 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 		a.Analyze(n.Body)
 		if n.CatchBody != nil {
 			catchEnv := environment.NewEnclosedEnvironment(a.env)
-			catchEnv.Set(n.CatchVar.Value, "any", environment.PUBLIC, false, a.filename, n.CatchVar.Token.Line, n.CatchVar.Token.Column)
+			catchEnv.Set(n.CatchVar.Value, "any", environment.PUBLIC, false, a.filename, n.CatchVar.Token.Line, n.CatchVar.Token.Column, "")
 			
 			oldEnv := a.env
 			a.env = catchEnv
@@ -1011,18 +1075,18 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 		return "any"
 
 	case *ast.InterfaceStatement:
-		a.env.Set(n.Name.Value, "interface", environment.PUBLIC, true, a.filename, n.Name.Token.Line, n.Name.Token.Column)
+		a.env.Set(n.Name.Value, "interface", environment.PUBLIC, true, a.filename, n.Name.Token.Line, n.Name.Token.Column, "")
 		a.interfaces[n.Name.Value] = n.Methods
 		return "interface"
 
 	case *ast.EnumStatement:
-		a.env.Set(n.Name.Value, "namespace", environment.PUBLIC, true, a.filename, n.Name.Token.Line, n.Name.Token.Column)
+		a.env.Set(n.Name.Value, "namespace", environment.PUBLIC, true, a.filename, n.Name.Token.Line, n.Name.Token.Column, "")
 		for _, v := range n.Variants {
 			variantKey := n.Name.Value + "." + v.Name.Value
 			if len(v.Types) == 0 {
-				a.env.Set(variantKey, "any", environment.PUBLIC, true, a.filename, v.Name.Token.Line, v.Name.Token.Column)
+				a.env.Set(variantKey, "any", environment.PUBLIC, true, a.filename, v.Name.Token.Line, v.Name.Token.Column, "")
 			} else {
-				a.env.Set(variantKey, "function", environment.PUBLIC, true, a.filename, v.Name.Token.Line, v.Name.Token.Column)
+				a.env.Set(variantKey, "function", environment.PUBLIC, true, a.filename, v.Name.Token.Line, v.Name.Token.Column, "")
 				sig := FunctionSignature{Params: v.Types, Return: n.Name.Value}
 				a.funcSignatures[variantKey] = sig
 			}
@@ -1059,9 +1123,9 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 			keyType := "any"
 			if iterableType == "array" || iterableType == "string" { keyType = "int" }
 			if iterableType == "map" { keyType = "string" }
-			a.env.Set(n.Key.Value, keyType, environment.PUBLIC, false, a.filename, n.Key.Token.Line, n.Key.Token.Column)
+			a.env.Set(n.Key.Value, keyType, environment.PUBLIC, false, a.filename, n.Key.Token.Line, n.Key.Token.Column, "")
 		}
-		a.env.Set(n.Value.Value, "any", environment.PUBLIC, false, a.filename, n.Value.Token.Line, n.Value.Token.Column)
+		a.env.Set(n.Value.Value, "any", environment.PUBLIC, false, a.filename, n.Value.Token.Line, n.Value.Token.Column, "")
 		
 		a.Analyze(n.Body)
 		
@@ -1086,7 +1150,17 @@ func (a *Analyzer) preScan(stmt ast.Statement) {
 		switch expr := s.Expression.(type) {
 		case *ast.FunctionLiteral:
 			if expr.Name != nil {
-					a.env.Set(expr.Name.Value, "function", environment.PUBLIC, true, a.filename, expr.Name.Token.Line, expr.Name.Token.Column)
+				a.env.Set(expr.Name.Value, "function", environment.PUBLIC, true, a.filename, expr.Name.Token.Line, expr.Name.Token.Column, expr.Docstring)
+				// Record definition
+				key := fmt.Sprintf("%s:%d:%d", a.filename, expr.Name.Token.Line, expr.Name.Token.Column)
+				a.ResolvedSymbols[key] = environment.Symbol{
+					Name:     expr.Name.Value,
+					Type:     "function",
+					Filename: a.filename,
+					Line:     expr.Name.Token.Line,
+					Column:   expr.Name.Token.Column,
+					Docstring: expr.Docstring,
+				}
 				sig := FunctionSignature{Return: expr.ReturnType}
 				for _, p := range expr.Parameters {
 					sig.Params = append(sig.Params, p.Type)
@@ -1103,7 +1177,7 @@ func (a *Analyzer) preScan(stmt ast.Statement) {
 				}
 			}
 		case *ast.StructLiteral:
-			a.env.Set(expr.Name.Value, "type", environment.PUBLIC, true, a.filename, expr.Name.Token.Line, expr.Name.Token.Column)
+			a.env.Set(expr.Name.Value, "type", environment.PUBLIC, true, a.filename, expr.Name.Token.Line, expr.Name.Token.Column, "")
 			if expr.Parent != nil {
 				a.structParents[expr.Name.Value] = expr.Parent.Value
 			}
@@ -1114,15 +1188,15 @@ func (a *Analyzer) preScan(stmt ast.Statement) {
 			a.structFields[expr.Name.Value] = fields
 		}
 	case *ast.InterfaceStatement:
-		a.env.Set(s.Name.Value, "interface", environment.PUBLIC, true, a.filename, s.Name.Token.Line, s.Name.Token.Column)
+		a.env.Set(s.Name.Value, "interface", environment.PUBLIC, true, a.filename, s.Name.Token.Line, s.Name.Token.Column, "")
 	case *ast.EnumStatement:
-		a.env.Set(s.Name.Value, "namespace", environment.PUBLIC, true, a.filename, s.Name.Token.Line, s.Name.Token.Column)
+		a.env.Set(s.Name.Value, "namespace", environment.PUBLIC, true, a.filename, s.Name.Token.Line, s.Name.Token.Column, "")
 		for _, v := range s.Variants {
 			variantKey := s.Name.Value + "." + v.Name.Value
 			if len(v.Types) == 0 {
-				a.env.Set(variantKey, "any", environment.PUBLIC, true, a.filename, v.Name.Token.Line, v.Name.Token.Column)
+				a.env.Set(variantKey, "any", environment.PUBLIC, true, a.filename, v.Name.Token.Line, v.Name.Token.Column, "")
 			} else {
-				a.env.Set(variantKey, "function", environment.PUBLIC, true, a.filename, v.Name.Token.Line, v.Name.Token.Column)
+				a.env.Set(variantKey, "function", environment.PUBLIC, true, a.filename, v.Name.Token.Line, v.Name.Token.Column, "")
 				sig := FunctionSignature{Params: v.Types, Return: s.Name.Value}
 				a.funcSignatures[variantKey] = sig
 			}
@@ -1134,7 +1208,7 @@ func (a *Analyzer) preScan(stmt ast.Statement) {
 func (a *Analyzer) analyzeDestructuring(pattern ast.Expression, isConst bool) {
 	switch p := pattern.(type) {
 	case *ast.Identifier:
-		a.env.Set(p.Value, "any", environment.PUBLIC, isConst, a.filename, p.Token.Line, p.Token.Column)
+		a.env.Set(p.Value, "any", environment.PUBLIC, isConst, a.filename, p.Token.Line, p.Token.Column, "")
 	case *ast.ArrayLiteral:
 		for _, el := range p.Elements {
 			a.analyzeDestructuring(el, isConst)
@@ -1148,7 +1222,7 @@ func (a *Analyzer) AnalyzeLambdaExpression(n *ast.LambdaExpression) string {
 	defer func() { a.env = prevEnv }()
 
 	for _, p := range n.Parameters {
-		a.env.Set(p.Name.Value, p.Type, environment.PUBLIC, false, a.filename, p.Name.Token.Line, p.Name.Token.Column)
+		a.env.Set(p.Name.Value, p.Type, environment.PUBLIC, false, a.filename, p.Name.Token.Line, p.Name.Token.Column, "")
 	}
 
 	return a.Analyze(n.Body)

@@ -1,0 +1,16 @@
+// This is a docstring for the greet function
+fn greet(name: string) {
+    let message = `Hello, ${name}!`;
+    println(message);
+}
+
+greet("ByteMe");
+
+struct User {
+    name: string
+}
+
+interface IGreet {
+    // Greets the user
+    fn greet(u: User)
+}

@@ -12,6 +12,7 @@ const (
 	FLOAT  TokenType = "FLOAT"  // 12.34
 	STRING TokenType = "STRING" // "hello world"
 	CHAR   TokenType = "CHAR"   // 'a'
+	TEMPLATE_STRING TokenType = "TEMPLATE_STRING" // `hello ${name}`
 
 	// Operators
 	ASSIGN   TokenType = "="

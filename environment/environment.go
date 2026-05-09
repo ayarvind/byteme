@@ -20,6 +20,7 @@ type Symbol struct {
 	Filename string
 	Line     int
 	Column   int
+	Docstring string
 }
 
 type Environment struct {
@@ -42,7 +43,7 @@ func NewEnclosedEnvironment(outer *Environment) *Environment {
 	return env
 }
 
-func (e *Environment) Set(name string, typeName string, access AccessModifier, isConst bool, filename string, line, col int) error {
+func (e *Environment) Set(name string, typeName string, access AccessModifier, isConst bool, filename string, line, col int, doc string) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if _, ok := e.store[name]; ok {
@@ -56,6 +57,7 @@ func (e *Environment) Set(name string, typeName string, access AccessModifier, i
 		Filename: filename,
 		Line: line,
 		Column: col,
+		Docstring: doc,
 	}
 	return nil
 }

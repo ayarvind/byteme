@@ -556,6 +556,17 @@ func (c *Compiler) Compile(node ast.Node) error {
 		str := &object.String{Value: n.Value}
 		c.emit(code.OpConstant, c.addConstant(str))
 
+	case *ast.TemplateStringLiteral:
+		for i, part := range n.Parts {
+			err := c.Compile(part)
+			if err != nil {
+				return err
+			}
+			if i > 0 {
+				c.emit(code.OpAdd)
+			}
+		}
+
 	case *ast.CharLiteral:
 		char := &object.Char{Value: n.Value}
 		c.emit(code.OpConstant, c.addConstant(char))
@@ -909,7 +920,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 					Definition: enumDef,
 					Variant:    variantName,
 				}
-				nsEnv.Set(variantName, "ENUM_INSTANCE", environment.PUBLIC, true, "", 0, 0)
+				nsEnv.Set(variantName, "ENUM_INSTANCE", environment.PUBLIC, true, "", 0, 0, "")
 				nsEnv.SetVal(variantName, instance)
 			} else {
 				// Otherwise create a constructor
@@ -917,7 +928,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 					Definition: enumDef,
 					Variant:    variantName,
 				}
-				nsEnv.Set(variantName, "ENUM_CONSTRUCTOR", environment.PUBLIC, true, "", 0, 0)
+				nsEnv.Set(variantName, "ENUM_CONSTRUCTOR", environment.PUBLIC, true, "", 0, 0, "")
 				nsEnv.SetVal(variantName, constructor)
 			}
 		}

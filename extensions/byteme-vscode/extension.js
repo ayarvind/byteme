@@ -12,7 +12,7 @@ function activate(context) {
                 const line = position.line + 1;
                 // ByteMe analyzer uses 1-based columns
                 const col = position.character + 1;
-                
+
                 const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
                 const cwd = workspaceFolder ? workspaceFolder.uri.fsPath : path.dirname(filename);
 
@@ -28,9 +28,9 @@ function activate(context) {
                     if (stdout.includes("No information found") || !stdout.trim()) {
                         return resolve(null);
                     }
-                    
+
                     const markdown = new vscode.MarkdownString();
-                    markdown.appendMarkdown("**ByteMe Variable Info**\n\n");
+                    // markdown.appendMarkdown("**ByteMe**\n\n");
                     markdown.appendCodeblock(stdout.trim(), 'text');
                     resolve(new vscode.Hover(markdown));
                 });
@@ -44,7 +44,7 @@ function activate(context) {
                 const filename = document.fileName;
                 const line = position.line + 1;
                 const col = position.character + 1;
-                
+
                 const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
                 const cwd = workspaceFolder ? workspaceFolder.uri.fsPath : path.dirname(filename);
 
@@ -56,7 +56,7 @@ function activate(context) {
                         console.error(`Definition error: ${error}`);
                         return resolve(null);
                     }
-                    
+
                     const match = stdout.match(/Definition: (.*):(\d+):(\d+)/);
                     if (match) {
                         const defFile = match[1];
@@ -76,7 +76,7 @@ function activate(context) {
     context.subscriptions.push(hoverProvider, definitionProvider);
 }
 
-function deactivate() {}
+function deactivate() { }
 
 module.exports = {
     activate,

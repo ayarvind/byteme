@@ -1,0 +1,91 @@
+// import "lib/web.byme" as web;
+from "lib/web.byme" import Web, appNew;
+
+// Persistence
+let DATA_FILE = "todo_app/todos.json";
+
+fn loadTodos() {
+    if (!osExists(DATA_FILE)) {
+        return [];
+    }
+    let content = fileRead(DATA_FILE);
+    if (content == "") {
+        return [];
+    }
+    return jsonParse(content);
+}
+
+fn saveTodos(todos) {
+    fileWrite(DATA_FILE, jsonStringify(todos));
+}
+
+let app = appNew(8080);
+
+// Route: Index
+app.route("/", (req) => {
+    let todos = loadTodos();
+    let template = fileRead("todo_app/index.html");
+    
+    let listHtml = "";
+    let i = 0;
+    while (i < len(todos)) {
+        let item = todos[i];
+        listHtml = listHtml + "<li><span class='todo-text'>" + item + "</span>";
+        listHtml = listHtml + "<a href='/delete?id=" + toString(i) + "' class='delete-btn'>Delete</a></li>";
+        i = i + 1;
+    }
+    
+    let context = map();
+    mapSet(context, "todo_list", listHtml);
+    
+    if (len(todos) == 0) {
+        mapSet(context, "empty_message", "<p class='empty-state'>No tasks yet. Add one above!</p>");
+    } else {
+        mapSet(context, "empty_message", "");
+    }
+    
+    let body = Web.render(template, context);
+    return Web.html(body);
+});
+
+// Route: Add
+app.route("/add", (req) => {
+    // Using the new utility from the web library
+    let form = Web.parseForm(req.body);
+    let task = mapGet(form, "task");
+    
+    if (task != null && task != "") {
+        let todos = loadTodos();
+        arrayPush(todos, task);
+        saveTodos(todos);
+    }
+    
+    return Web.redirect("/");
+});
+
+// Route: Delete
+app.route("/delete", (req) => {
+    // Using the new utility from the web library to parse query params
+    let query = Web.parseForm(req.query);
+    let idStr = mapGet(query, "id");
+    
+    if (idStr != null) {
+        let id = toInt(idStr);
+        let todos = loadTodos();
+        
+        let newTodos = [];
+        let i = 0;
+        while (i < len(todos)) {
+            if (i != id) {
+                arrayPush(newTodos, todos[i]);
+            }
+            i = i + 1;
+        }
+        saveTodos(newTodos);
+    }
+    
+    return Web.redirect("/");
+});
+
+println("Starting Todo App on http://localhost:8080...");
+app.start();

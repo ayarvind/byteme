@@ -303,6 +303,23 @@ func (sl *StringLiteral) TokenLiteral() string { return sl.Token.Literal }
 func (sl *StringLiteral) GetToken() token.Token { return sl.Token }
 func (sl *StringLiteral) String() string       { return sl.Token.Literal }
 
+type TemplateStringLiteral struct {
+	Token token.Token
+	Parts []Expression
+}
+func (tsl *TemplateStringLiteral) expressionNode()      {}
+func (tsl *TemplateStringLiteral) TokenLiteral() string { return tsl.Token.Literal }
+func (tsl *TemplateStringLiteral) GetToken() token.Token { return tsl.Token }
+func (tsl *TemplateStringLiteral) String() string {
+	var out bytes.Buffer
+	out.WriteString("`")
+	for _, p := range tsl.Parts {
+		out.WriteString(p.String())
+	}
+	out.WriteString("`")
+	return out.String()
+}
+
 type CharLiteral struct {
 	Token token.Token
 	Value rune
@@ -442,6 +459,7 @@ type FunctionLiteral struct {
 	ReturnType     string
 	IsAsync        bool
 	TypeParameters []*Identifier
+	Docstring      string
 }
 type Parameter struct {
 	Token token.Token // Added token for interface fulfillment
@@ -536,6 +554,7 @@ type MethodSignature struct {
 	Name       *Identifier
 	Parameters []*Parameter
 	ReturnType string
+	Docstring  string
 }
 func (ms *MethodSignature) TokenLiteral() string { return ms.Token.Literal }
 func (ms *MethodSignature) GetToken() token.Token { return ms.Token }
