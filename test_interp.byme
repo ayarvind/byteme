@@ -1,3 +1,0 @@
-let name = "ByteMe";
-let x = `hello ${name}`;
-println(x);

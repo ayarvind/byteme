@@ -1,0 +1,58 @@
+from "lib/console.byme" import Console
+
+fn merge(left: array, right: array) -> array {
+    let result = [];
+    let i = 0;
+    let j = 0;
+
+    while (i < len(left) && j < len(right)) {
+        if (left[i] < right[j]) {
+            arrayPush(result, left[i]);
+            i++;
+        } else {
+            arrayPush(result, right[j]);
+            j++;
+        }
+    }
+
+    // Add remaining elements
+    while (i < len(left)) {
+        arrayPush(result, left[i]);
+        i++;
+    }
+    while (j < len(right)) {
+        arrayPush(result, right[j]);
+        j++;
+    }
+
+    return result;
+}
+
+fn mergeSort(arr: array) -> array {
+    if (len(arr) <= 1) {
+        return arr;
+    }
+
+    let mid = len(arr) / 2;
+    let left = arraySlice(arr, 0, mid);
+    let right = arraySlice(arr, mid, len(arr));
+
+    return merge(mergeSort(left), mergeSort(right));
+}
+
+fn main() -> void {
+    // merge sort algorithm test
+    let arr = [];
+    let n: int = Console.inputInt("Enter the size of array : ");
+    println(`The size of array is ${n}`);
+    for (let i = 0; i < n; i++) {
+        let temp = Console.inputInt("Enter element " + toString(i + 1) + ": ");
+        arrayPush(arr, temp);
+    }
+    
+    Console.log("Original array: " + toString(arr));
+    let sorted = mergeSort(arr);
+    Console.log("Sorted array: " + toString(sorted));
+}
+
+main();

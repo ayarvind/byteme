@@ -4,23 +4,23 @@
 struct ConsoleUtility {}
 
 // Prints message to console with a newline
-fn (u: ConsoleUtility) log(msg) {
+fn (u: ConsoleUtility) log(msg: any) -> void {
     println(msg);
 }
 
 // Reads a line of input from the console with an optional prompt
-fn (u: ConsoleUtility) input(prompt) {
+fn (u: ConsoleUtility) input(prompt: string) -> string {
     return ioReadInput(prompt);
 }
 
 // Reads a line of input and attempts to convert it to an integer
-fn (u: ConsoleUtility) inputInt(prompt) {
+fn (u: ConsoleUtility) inputInt(prompt: string) -> int {
     let s = ioReadInput(prompt);
     return toInt(s);
 }
 
 // Reads a line of input and attempts to convert it to a float
-fn (u: ConsoleUtility) inputFloat(prompt) {
+fn (u: ConsoleUtility) inputFloat(prompt: string) -> float {
     let s = ioReadInput(prompt);
     return toFloat(s);
 }

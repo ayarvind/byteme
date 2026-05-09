@@ -220,6 +220,12 @@ func New(env *environment.Environment, source string, filename string) *Analyzer
 	a.builtinSignatures["fileWrite"] = FunctionSignature{Params: []string{"string", "string"}, Return: "void"}
 	a.builtinSignatures["strSplit"] = FunctionSignature{Params: []string{"string", "string"}, Return: "array"}
 	a.builtinSignatures["strReplace"] = FunctionSignature{Params: []string{"string", "string", "string", "int"}, Return: "string"}
+	a.builtinSignatures["ioReadInput"] = FunctionSignature{Params: []string{"string"}, Return: "string"}
+	a.builtinSignatures["toInt"] = FunctionSignature{Params: []string{"any"}, Return: "int"}
+	a.builtinSignatures["toFloat"] = FunctionSignature{Params: []string{"any"}, Return: "float"}
+	a.builtinSignatures["toString"] = FunctionSignature{Params: []string{"any"}, Return: "string"}
+	a.builtinSignatures["arrayPush"] = FunctionSignature{Params: []string{"array", "any"}, Return: "array"}
+	a.builtinSignatures["arraySlice"] = FunctionSignature{Params: []string{"array", "int", "int"}, Return: "array"}
 	
 	// Populate signatures in environment
 	for name, sig := range a.builtinSignatures {

@@ -17,7 +17,10 @@ import (
 	"unicode"
 	"bufio"
 	"sort"
+	"strconv"
 )
+
+var stdinReader = bufio.NewReader(os.Stdin)
 
 var Builtins = []*Builtin{
 	{ // 0: println
@@ -509,6 +512,10 @@ var Builtins = []*Builtin{
 			switch arg := args[0].(type) {
 			case *Integer: return arg
 			case *Float: return &Integer{Value: int64(arg.Value)}
+			case *String:
+				val, err := strconv.ParseInt(arg.Value, 0, 64)
+				if err != nil { return NULL }
+				return &Integer{Value: val}
 			default: return NULL
 			}
 		},
@@ -519,6 +526,10 @@ var Builtins = []*Builtin{
 			switch arg := args[0].(type) {
 			case *Integer: return &Float{Value: float64(arg.Value)}
 			case *Float: return arg
+			case *String:
+				val, err := strconv.ParseFloat(arg.Value, 64)
+				if err != nil { return NULL }
+				return &Float{Value: val}
 			default: return NULL
 			}
 		},
@@ -878,8 +889,7 @@ var Builtins = []*Builtin{
 					fmt.Print(prompt.Value)
 				}
 			}
-			reader := bufio.NewReader(os.Stdin)
-			text, _ := reader.ReadString('\n')
+			text, _ := stdinReader.ReadString('\n')
 			return &String{Value: strings.TrimRight(text, "\r\n")}
 		},
 	},

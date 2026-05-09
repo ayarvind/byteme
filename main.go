@@ -117,11 +117,14 @@ func main() {
 	a := analyzer.New(env, string(input), filename)
 	a.Analyze(program)
 	
-	// If we are just linting, we exit on errors.
-	// But for hover/definition, we want to provide info even if the program has errors elsewhere.
-	if *lintOnly && len(a.Errors()) != 0 {
-		printErrors("Analyzer", a.Errors())
-		os.Exit(1)
+	// If we are just linting, we exit.
+	if *lintOnly {
+		if len(a.Errors()) != 0 {
+			printErrors("Analyzer", a.Errors())
+			os.Exit(1)
+		}
+		fmt.Println("No semantic errors found.")
+		os.Exit(0)
 	}
 
 	if *hoverPos != "" {
