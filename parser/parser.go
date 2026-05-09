@@ -13,6 +13,7 @@ const (
 	_ int = iota
 	LOWEST
 	ASSIGN      // =
+	PIPE        // |>
 	EQUALS      // ==
 	LESSGREATER // > or <
 	SUM         // +
@@ -47,6 +48,11 @@ var precedences = map[token.TokenType]int{
 	token.DOT:      ACCESS,
 	token.INC:      POSTFIX,
 	token.DEC:      POSTFIX,
+	token.PIPE:     PIPE,
+	token.PLUS_ASSIGN:  ASSIGN,
+	token.MINUS_ASSIGN: ASSIGN,
+	token.MUL_ASSIGN:   ASSIGN,
+	token.DIV_ASSIGN:   ASSIGN,
 }
 
 func (p *Parser) registerParsers() {
@@ -76,16 +82,21 @@ func (p *Parser) registerParsers() {
 	p.infixParseFns = make(map[token.TokenType]infixParseFn)
 	p.registerInfix(token.PLUS, p.parseInfixExpression)
 	p.registerInfix(token.MINUS, p.parseInfixExpression)
-	p.registerInfix(token.SLASH, p.parseInfixExpression)
 	p.registerInfix(token.ASTERISK, p.parseInfixExpression)
+	p.registerInfix(token.SLASH, p.parseInfixExpression)
 	p.registerInfix(token.MOD, p.parseInfixExpression)
+	p.registerInfix(token.PLUS_ASSIGN, p.parseInfixExpression)
+	p.registerInfix(token.MINUS_ASSIGN, p.parseInfixExpression)
+	p.registerInfix(token.MUL_ASSIGN, p.parseInfixExpression)
+	p.registerInfix(token.DIV_ASSIGN, p.parseInfixExpression)
 	p.registerInfix(token.LSHIFT, p.parseInfixExpression)
 	p.registerInfix(token.RSHIFT, p.parseInfixExpression)
+	p.registerInfix(token.PIPE, p.parsePipeExpression)
+	p.registerInfix(token.EQ, p.parseInfixExpression)
+	p.registerInfix(token.NOT_EQ, p.parseInfixExpression)
 	p.registerInfix(token.BIT_AND, p.parseInfixExpression)
 	p.registerInfix(token.BIT_OR, p.parseInfixExpression)
 	p.registerInfix(token.BIT_XOR, p.parseInfixExpression)
-	p.registerInfix(token.EQ, p.parseInfixExpression)
-	p.registerInfix(token.NOT_EQ, p.parseInfixExpression)
 	p.registerInfix(token.LT, p.parseGenericCallExpression)
 	p.registerInfix(token.GT, p.parseInfixExpression)
 	p.registerInfix(token.LTE, p.parseInfixExpression)
@@ -515,8 +526,21 @@ func (p *Parser) parseEnumStatement() *ast.EnumStatement {
 
 	for !p.curTokenIs(token.RBRACE) && !p.curTokenIs(token.EOF) {
 		if p.curTokenIs(token.IDENT) {
-			ident := &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
-			stmt.Members = append(stmt.Members, ident)
+			variant := &ast.EnumVariant{
+				Name: &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal},
+			}
+			if p.peekTokenIs(token.LPAREN) {
+				p.nextToken() // (
+				p.nextToken() // first type
+				for !p.curTokenIs(token.RPAREN) && !p.curTokenIs(token.EOF) {
+					variant.Types = append(variant.Types, p.curToken.Literal)
+					if p.peekTokenIs(token.COMMA) {
+						p.nextToken()
+					}
+					p.nextToken()
+				}
+			}
+			stmt.Variants = append(stmt.Variants, variant)
 		}
 		if p.peekTokenIs(token.COMMA) {
 			p.nextToken()
@@ -798,6 +822,25 @@ func (p *Parser) parsePostfixExpression(left ast.Expression) ast.Expression {
 		Token:    p.curToken,
 		Operator: p.curToken.Literal,
 		Left:     left,
+	}
+}
+
+func (p *Parser) parsePipeExpression(left ast.Expression) ast.Expression {
+	precedence := p.curPrecedence()
+	p.nextToken()
+	right := p.parseExpression(precedence)
+
+	// Transform x |> f(y) to f(x, y)
+	if call, ok := right.(*ast.CallExpression); ok {
+		call.Arguments = append([]ast.Expression{left}, call.Arguments...)
+		return call
+	}
+
+	// If right is an Identifier or something else, treat as a call with one arg
+	return &ast.CallExpression{
+		Token:    p.curToken,
+		Function: right,
+		Arguments: []ast.Expression{left},
 	}
 }
 

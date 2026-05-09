@@ -6,6 +6,7 @@ import (
 
 	"github.com/byteme/compiler/ast"
 	"github.com/byteme/compiler/code"
+	"github.com/byteme/compiler/environment"
 	"github.com/byteme/compiler/lexer"
 	"github.com/byteme/compiler/object"
 	"github.com/byteme/compiler/parser"
@@ -300,58 +301,77 @@ func (c *Compiler) Compile(node ast.Node) error {
 		if n.Operator == ">=" {
 			// left >= right -> !(left < right) -> !(right > left)
 			err := c.Compile(n.Right)
-			if err != nil {
-				return err
-			}
+			if err != nil { return err }
 			err = c.Compile(n.Left)
-			if err != nil {
-				return err
-			}
+			if err != nil { return err }
 			c.emit(code.OpGreaterThan)
 			c.emit(code.OpBang)
 			return nil
 		}
 
-		err := c.Compile(n.Left)
-		if err != nil {
-			return err
+		if n.Operator == "+=" || n.Operator == "-=" || n.Operator == "*=" || n.Operator == "/=" {
+			baseOp := string(n.Operator[0])
+			switch target := n.Left.(type) {
+			case *ast.Identifier:
+				sym, ok := c.symbolTable.Resolve(target.Value)
+				if !ok { return fmt.Errorf("undefined variable: %s", target.Value) }
+				c.loadSymbol(sym)
+				err := c.Compile(n.Right)
+				if err != nil { return err }
+				c.emitInfixOp(baseOp)
+				c.emit(code.OpDup)
+				c.storeSymbol(sym)
+				return nil
+			case *ast.IndexExpression:
+				err := c.Compile(target.Left)
+				if err != nil { return err }
+				err = c.Compile(target.Index)
+				if err != nil { return err }
+				c.emit(code.OpDup2)
+				c.emit(code.OpIndex)
+				err = c.Compile(n.Right)
+				if err != nil { return err }
+				c.emitInfixOp(baseOp)
+				// [arr, idx, new_val]
+				c.emit(code.OpPick, 2)
+				c.emit(code.OpPick, 2)
+				c.emit(code.OpPick, 2)
+				c.emit(code.OpSetIndex)
+				c.emit(code.OpPop)
+				c.emit(code.OpRot)
+				c.emit(code.OpPop)
+				c.emit(code.OpPop)
+				return nil
+			case *ast.InfixExpression: // Dot access
+				if target.Operator == "." {
+					ident := target.Right.(*ast.Identifier)
+					err := c.Compile(target.Left)
+					if err != nil { return err }
+					c.emit(code.OpDup)
+					fieldNameIdx := c.addConstant(&object.String{Value: ident.Value})
+					c.emit(code.OpGetField, fieldNameIdx)
+					err = c.Compile(n.Right)
+					if err != nil { return err }
+					c.emitInfixOp(baseOp)
+					// [inst, new_val]
+					c.emit(code.OpDup2)
+					c.emit(code.OpSetField, fieldNameIdx)
+					c.emit(code.OpPop)
+					c.emit(code.OpSwap)
+					c.emit(code.OpPop)
+					return nil
+				}
+			}
+			return fmt.Errorf("invalid compound assignment target")
 		}
+
+		err := c.Compile(n.Left)
+		if err != nil { return err }
 
 		err = c.Compile(n.Right)
-		if err != nil {
-			return err
-		}
+		if err != nil { return err }
 
-		switch n.Operator {
-		case "+":
-			c.emit(code.OpAdd)
-		case "-":
-			c.emit(code.OpSub)
-		case "*":
-			c.emit(code.OpMul)
-		case "/":
-			c.emit(code.OpDiv)
-		case "%":
-			c.emit(code.OpMod)
-		case ">":
-			c.emit(code.OpGreaterThan)
-		case "==":
-			c.emit(code.OpEqual)
-		case "!=":
-			c.emit(code.OpNotEqual)
-		case "&":
-			c.emit(code.OpBitAnd)
-		case "|":
-			c.emit(code.OpBitOr)
-		case "^":
-			c.emit(code.OpBitXor)
-		case "<<":
-			c.emit(code.OpLShift)
-		case ">>":
-			c.emit(code.OpRShift)
-		default:
-			return fmt.Errorf("unknown operator %s", n.Operator)
-		}
+		return c.emitInfixOp(n.Operator)
 
 	case *ast.PrefixExpression:
 		if n.Operator == "++" || n.Operator == "--" {
@@ -560,28 +580,24 @@ func (c *Compiler) Compile(node ast.Node) error {
 		// Since IfExpression is an expression, we must push a value (null) at the end of the block.
 		c.emit(code.OpNull)
 
+		jumpToEndPos := c.emit(code.OpJump, 9999)
+
+		afterConsequencePos := len(c.instructions)
+		c.changeOperand(jumpNotTruthyPos, afterConsequencePos)
+
 		if n.Alternative == nil {
-			afterConsequencePos := len(c.instructions)
-			c.changeOperand(jumpNotTruthyPos, afterConsequencePos)
-			// We already pushed OpNull for the consequence.
-			// But for the 'false' case where there is no alternative, we need another Null.
 			c.emit(code.OpNull)
 		} else {
-			jumpPos := c.emit(code.OpJump, 9999)
-
-			afterConsequencePos := len(c.instructions)
-			c.changeOperand(jumpNotTruthyPos, afterConsequencePos)
-
 			err = c.Compile(n.Alternative)
 			if err != nil {
 				return err
 			}
-			// Alternative is also a *BlockStatement, push null.
 			c.emit(code.OpNull)
-
-			afterAlternativePos := len(c.instructions)
-			c.changeOperand(jumpPos, afterAlternativePos)
 		}
+
+		afterEndPos := len(c.instructions)
+		c.changeOperand(jumpToEndPos, afterEndPos)
+
 		return nil
 
 	case *ast.WhileStatement:
@@ -827,9 +843,52 @@ func (c *Compiler) Compile(node ast.Node) error {
 		c.emit(code.OpNull)
 
 	case *ast.EnumStatement:
+		enumDef := &object.EnumDefinition{
+			Name:     n.Name.Value,
+			Variants: make(map[string]*object.EnumVariantDef),
+		}
+
+		nsEnv := environment.NewEnvironment()
+		for _, v := range n.Variants {
+			variantName := v.Name.Value
+			enumDef.Variants[variantName] = &object.EnumVariantDef{
+				Name:  variantName,
+				Types: v.Types,
+			}
+
+			// If it's a simple variant (no associated values), we can create it now
+			if len(v.Types) == 0 {
+				instance := &object.EnumInstance{
+					Definition: enumDef,
+					Variant:    variantName,
+				}
+				nsEnv.Set(variantName, "ENUM_INSTANCE", environment.PUBLIC, true)
+				nsEnv.SetVal(variantName, instance)
+			} else {
+				// Otherwise create a constructor
+				constructor := &object.EnumConstructor{
+					Definition: enumDef,
+					Variant:    variantName,
+				}
+				nsEnv.Set(variantName, "ENUM_CONSTRUCTOR", environment.PUBLIC, true)
+				nsEnv.SetVal(variantName, constructor)
+			}
+		}
+
+		// The enum itself is a namespace that contains the variants
+		ns := &object.Namespace{
+			Name: n.Name.Value,
+			Env:  nsEnv,
+		}
+
+		// Since we might need the EnumDefinition during variant construction in VM,
+		// we should probably store it somewhere or make the Namespace aware.
+		// For now, let's just emit the Namespace.
+
+		c.emit(code.OpConstant, c.addConstant(ns))
+
 		if n.Name != nil {
 			symbol := c.symbolTable.Define(n.Name.Value)
-			c.emit(code.OpNull)
 			if symbol.Scope == GlobalScope {
 				c.emit(code.OpSetGlobal, symbol.Index)
 			} else {
@@ -1275,4 +1334,38 @@ func (c *Compiler) emitUnpack(pattern ast.Expression) {
 		}
 		c.emit(code.OpPop) // pop the duplicated array
 	}
+}
+
+func (c *Compiler) emitInfixOp(op string) error {
+	switch op {
+	case "+":
+		c.emit(code.OpAdd)
+	case "-":
+		c.emit(code.OpSub)
+	case "*":
+		c.emit(code.OpMul)
+	case "/":
+		c.emit(code.OpDiv)
+	case "%":
+		c.emit(code.OpMod)
+	case ">":
+		c.emit(code.OpGreaterThan)
+	case "==":
+		c.emit(code.OpEqual)
+	case "!=":
+		c.emit(code.OpNotEqual)
+	case "&":
+		c.emit(code.OpBitAnd)
+	case "|":
+		c.emit(code.OpBitOr)
+	case "^":
+		c.emit(code.OpBitXor)
+	case "<<":
+		c.emit(code.OpLShift)
+	case ">>":
+		c.emit(code.OpRShift)
+	default:
+		return fmt.Errorf("unknown operator %s", op)
+	}
+	return nil
 }

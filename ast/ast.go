@@ -524,10 +524,15 @@ func (is *InterfaceStatement) TokenLiteral() string { return is.Token.Literal }
 func (is *InterfaceStatement) GetToken() token.Token { return is.Token }
 func (is *InterfaceStatement) String() string       { return "interface " + is.Name.String() }
 
+type EnumVariant struct {
+	Name  *Identifier
+	Types []string // Optional associated value types
+}
+
 type EnumStatement struct {
-	Token   token.Token // 'enum'
-	Name    *Identifier
-	Members []*Identifier
+	Token    token.Token // 'enum'
+	Name     *Identifier
+	Variants []*EnumVariant
 }
 func (es *EnumStatement) statementNode()       {}
 func (es *EnumStatement) TokenLiteral() string { return es.Token.Literal }

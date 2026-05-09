@@ -234,9 +234,16 @@ func builtinHTTPPost(args ...Object) Object {
 	defer resp.Body.Close()
 
 	bodyBytes, _ := io.ReadAll(resp.Body)
+
+	headers := NewStringMap(make(map[string]Object))
+	for k, v := range resp.Header {
+		headers.Pairs[k] = MapPair{Key: &String{Value: k}, Value: &String{Value: strings.Join(v, ", ")}}
+	}
+
 	return NewStringMap(map[string]Object{
-		"status": &Integer{Value: int64(resp.StatusCode)},
-		"body":   &String{Value: string(bodyBytes)},
+		"status":  &Integer{Value: int64(resp.StatusCode)},
+		"body":    &String{Value: string(bodyBytes)},
+		"headers": headers,
 	})
 }
 

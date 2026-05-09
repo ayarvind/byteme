@@ -827,9 +827,22 @@ func evalTryStatement(ts *ast.TryStatement, env *environment.Environment) object
 }
 
 func evalEnumStatement(es *ast.EnumStatement, env *environment.Environment) object.Object {
+	enumDef := &object.EnumDefinition{
+		Name:     es.Name.Value,
+		Variants: make(map[string]*object.EnumVariantDef),
+	}
 	nsEnv := environment.NewEnclosedEnvironment(env)
-	for i, member := range es.Members {
-		nsEnv.SetVal(member.Value, &object.Integer{Value: int64(i)})
+	for _, v := range es.Variants {
+		variantName := v.Name.Value
+		enumDef.Variants[variantName] = &object.EnumVariantDef{
+			Name:  variantName,
+			Types: v.Types,
+		}
+		if len(v.Types) == 0 {
+			nsEnv.SetVal(variantName, &object.EnumInstance{Definition: enumDef, Variant: variantName})
+		} else {
+			nsEnv.SetVal(variantName, &object.EnumConstructor{Definition: enumDef, Variant: variantName})
+		}
 	}
 	ns := &object.Namespace{Name: es.Name.Value, Env: nsEnv}
 	env.SetVal(es.Name.Value, ns)

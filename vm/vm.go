@@ -452,6 +452,15 @@ func (vm *VM) Run() error {
 			case *object.Map:
 				err := vm.pushMapField(inst, fieldName)
 				if err != nil { return err }
+			case *object.Namespace:
+				val, ok := inst.Env.GetVal(fieldName)
+				if ok {
+					err := vm.push(val.(object.Object))
+					if err != nil { return err }
+				} else {
+					err := vm.push(object.NULL)
+					if err != nil { return err }
+				}
 			default:
 				return fmt.Errorf("cannot access field '%s' on %s", fieldName, instance.Type())
 			}
@@ -737,6 +746,22 @@ func (vm *VM) executeCall(fn object.Object, numArgs int) error {
 		}
 		vm.sp = vm.sp - numArgs - 1
 		return vm.push(instance)
+	case *object.EnumConstructor:
+		// Enum constructor: Shape.Circle(1.5) -> EnumInstance
+		variantDef := callee.Definition.Variants[callee.Variant]
+		if numArgs != len(variantDef.Types) {
+			return fmt.Errorf("enum variant %s.%s requires %d values, got %d", callee.Definition.Name, callee.Variant, len(variantDef.Types), numArgs)
+		}
+		instance := &object.EnumInstance{
+			Definition: callee.Definition,
+			Variant:    callee.Variant,
+			Values:     make([]object.Object, numArgs),
+		}
+		for i := 0; i < numArgs; i++ {
+			instance.Values[i] = vm.stack[vm.sp-numArgs+i]
+		}
+		vm.sp = vm.sp - numArgs - 1
+		return vm.push(instance)
 	case *object.BoundMethod:
 		if numArgs != callee.Method.NumParameters-1 {
 			return fmt.Errorf("wrong number of arguments for method: want=%d, got=%d", callee.Method.NumParameters-1, numArgs)
@@ -915,8 +940,14 @@ func (vm *VM) executeComparison(op code.Opcode) error {
 	}
 	switch op {
 	case code.OpEqual:
+		if left.Type() == object.STRING_OBJ && right.Type() == object.STRING_OBJ {
+			return vm.push(nativeBoolToBooleanObject(left.(*object.String).Value == right.(*object.String).Value))
+		}
 		return vm.push(nativeBoolToBooleanObject(left == right))
 	case code.OpNotEqual:
+		if left.Type() == object.STRING_OBJ && right.Type() == object.STRING_OBJ {
+			return vm.push(nativeBoolToBooleanObject(left.(*object.String).Value != right.(*object.String).Value))
+		}
 		return vm.push(nativeBoolToBooleanObject(left != right))
 	case code.OpGreaterThan:
 		return vm.push(nativeBoolToBooleanObject(left.Inspect() > right.Inspect()))

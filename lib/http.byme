@@ -1,0 +1,71 @@
+// ByteMe Standard Library: HTTP
+// Provides a clean, object-oriented interface for making HTTP requests.
+
+// Response represents the result of an HTTP request.
+struct Response {
+    status: int,
+    body: string,
+    headers: any
+}
+
+// json parses the response body as a ByteMe object (map or array).
+fn (r: Response) json() -> any {
+    return jsonParse(r.body);
+}
+
+// isOk returns true if the status code indicates success (2xx).
+fn (r: Response) isOk() -> bool {
+    if (r.status < 200) { return false; }
+    if (r.status >= 300) { return false; }
+    return true;
+}
+
+// HttpUtility provides methods for making HTTP requests.
+struct HttpUtility {}
+
+// get performs an HTTP GET request to the specified URL.
+fn (u: HttpUtility) get(url) -> Response {
+    let res = httpGet(url);
+    return Response(res.status, res.body, res.headers);
+}
+
+// post performs an HTTP POST request to the specified URL.
+// The body can be a string or a map/array (which will be stringified as JSON).
+fn (u: HttpUtility) post(url, body) -> Response {
+    let payload = body;
+    let t = typeof(body);
+    if (t == "map") {
+        payload = jsonStringify(body);
+    } else {
+        if (t == "array") {
+            payload = jsonStringify(body);
+        }
+    }
+    let res = httpPost(url, payload);
+    if (typeof(res) == "ERROR") {
+        return Response(0, toString(res), map());
+    }
+    return Response(res.status, res.body, res.headers);
+}
+
+// urlWithParams appends query parameters to a base URL.
+fn (u: HttpUtility) urlWithParams(baseUrl, params) -> string {
+    let query = "";
+    let keys = mapKeys(params);
+    let i = 0;
+    while (i < len(keys)) {
+        let key = keys[i];
+        let val = toString(mapGet(params, key));
+        if (i > 0) { query = query + "&"; }
+        query = query + key + "=" + val;
+        i = i + 1;
+    }
+    
+    if (len(query) > 0) {
+        return baseUrl + "?" + query;
+    }
+    return baseUrl;
+}
+
+// Export the Http utility
+let Http = HttpUtility();

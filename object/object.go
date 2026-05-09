@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"strings"
 	"github.com/byteme/compiler/ast"
 	"github.com/byteme/compiler/environment"
 )
@@ -296,3 +297,41 @@ func (g *Generator) Next() (Object, bool) {
 	return nil, false
 }
 
+type EnumVariantDef struct {
+	Name  string
+	Types []string
+}
+
+type EnumDefinition struct {
+	Name     string
+	Variants map[string]*EnumVariantDef
+}
+
+func (e *EnumDefinition) Type() ObjectType { return "ENUM_DEFINITION" }
+func (e *EnumDefinition) Inspect() string  { return fmt.Sprintf("enum %s", e.Name) }
+
+type EnumInstance struct {
+	Definition *EnumDefinition
+	Variant    string
+	Values     []Object
+}
+
+func (e *EnumInstance) Type() ObjectType { return "ENUM_INSTANCE" }
+func (e *EnumInstance) Inspect() string {
+	if len(e.Values) == 0 {
+		return fmt.Sprintf("%s.%s", e.Definition.Name, e.Variant)
+	}
+	vals := make([]string, len(e.Values))
+	for i, v := range e.Values {
+		vals[i] = v.Inspect()
+	}
+	return fmt.Sprintf("%s.%s(%s)", e.Definition.Name, e.Variant, strings.Join(vals, ", "))
+}
+
+type EnumConstructor struct {
+	Definition *EnumDefinition
+	Variant    string
+}
+
+func (e *EnumConstructor) Type() ObjectType { return "ENUM_CONSTRUCTOR" }
+func (e *EnumConstructor) Inspect() string  { return fmt.Sprintf("constructor %s.%s", e.Definition.Name, e.Variant) }

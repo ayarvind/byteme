@@ -23,6 +23,12 @@ const (
 	INC      TokenType = "++"
 	DEC      TokenType = "--"
 
+	PLUS_ASSIGN  TokenType = "+="
+	MINUS_ASSIGN TokenType = "-="
+	MUL_ASSIGN   TokenType = "*="
+	DIV_ASSIGN   TokenType = "/="
+	PIPE         TokenType = "|>"
+
 	LT TokenType = "<"
 	GT TokenType = ">"
 	LTE TokenType = "<="
@@ -37,6 +43,9 @@ const (
 
 	EQ     TokenType = "=="
 	NOT_EQ TokenType = "!="
+
+	AND    TokenType = "&&"
+	OR     TokenType = "||"
 
 	// Delimiters
 	COMMA     TokenType = ","

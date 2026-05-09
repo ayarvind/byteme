@@ -584,6 +584,16 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 			
 			rightIdent, isIdent := n.Right.(*ast.Identifier)
 			if isIdent {
+				// Handle namespaces (enums)
+				if leftType == "namespace" {
+					if leftIdent, ok := n.Left.(*ast.Identifier); ok {
+						compoundKey := leftIdent.Value + "." + rightIdent.Value
+						if sym, ok := a.env.Get(compoundKey); ok {
+							return sym.Type
+						}
+					}
+				}
+
 				// Check fields
 				if fieldType, ok := a.lookupField(leftType, rightIdent.Value); ok {
 					return fieldType
@@ -603,11 +613,18 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 			}
 			return "any"
 		}
-		if n.Operator == "=" {
+		if n.Operator == "=" || n.Operator == "+=" || n.Operator == "-=" || n.Operator == "*=" || n.Operator == "/=" {
 			leftType := a.Analyze(n.Left)
 			rightType := a.Analyze(n.Right)
+
+			if !a.isAssignableNode(n.Left) {
+				a.error(n.Token, "operator %s must be applied to an assignable expression", n.Operator)
+			}
+
 			if !a.isAssignable(leftType, rightType) {
-				a.error(n.Token, "type mismatch in assignment: cannot assign %s to %s", rightType, leftType)
+				if !(n.Operator == "+=" && (leftType == "string" || rightType == "string")) {
+					a.error(n.Token, "type mismatch in assignment: cannot assign %s to %s", rightType, leftType)
+				}
 			}
 
 			// Check for constant reassignment
@@ -618,7 +635,7 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 					}
 				}
 			}
-			return rightType
+			return leftType
 		}
 		leftType := a.Analyze(n.Left)
 		rightType := a.Analyze(n.Right)
@@ -955,6 +972,16 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 
 	case *ast.EnumStatement:
 		a.env.Set(n.Name.Value, "namespace", environment.PUBLIC, true)
+		for _, v := range n.Variants {
+			variantKey := n.Name.Value + "." + v.Name.Value
+			if len(v.Types) == 0 {
+				a.env.Set(variantKey, "any", environment.PUBLIC, true)
+			} else {
+				a.env.Set(variantKey, "function", environment.PUBLIC, true)
+				sig := FunctionSignature{Params: v.Types, Return: n.Name.Value}
+				a.funcSignatures[variantKey] = sig
+			}
+		}
 		return "namespace"
 
 	case *ast.ForStatement:
@@ -1046,6 +1073,16 @@ func (a *Analyzer) preScan(stmt ast.Statement) {
 		a.env.Set(s.Name.Value, "interface", environment.PUBLIC, true)
 	case *ast.EnumStatement:
 		a.env.Set(s.Name.Value, "namespace", environment.PUBLIC, true)
+		for _, v := range s.Variants {
+			variantKey := s.Name.Value + "." + v.Name.Value
+			if len(v.Types) == 0 {
+				a.env.Set(variantKey, "any", environment.PUBLIC, true)
+			} else {
+				a.env.Set(variantKey, "function", environment.PUBLIC, true)
+				sig := FunctionSignature{Params: v.Types, Return: s.Name.Value}
+				a.funcSignatures[variantKey] = sig
+			}
+		}
 	case *ast.LetStatement:
 		// We don't pre-scan variables to avoid uninitialized usage
 	}

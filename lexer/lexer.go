@@ -68,6 +68,10 @@ func (l *Lexer) NextToken() token.Token {
 			ch := l.ch
 			l.readChar()
 			tok = token.Token{Type: token.INC, Literal: string(ch) + string(l.ch), Line: startLine, Column: startColumn}
+		} else if l.peekChar() == '=' {
+			ch := l.ch
+			l.readChar()
+			tok = token.Token{Type: token.PLUS_ASSIGN, Literal: string(ch) + string(l.ch), Line: startLine, Column: startColumn}
 		} else {
 			tok = l.newToken(token.PLUS, l.ch)
 		}
@@ -80,6 +84,10 @@ func (l *Lexer) NextToken() token.Token {
 			ch := l.ch
 			l.readChar()
 			tok = token.Token{Type: token.DEC, Literal: string(ch) + string(l.ch), Line: startLine, Column: startColumn}
+		} else if l.peekChar() == '=' {
+			ch := l.ch
+			l.readChar()
+			tok = token.Token{Type: token.MINUS_ASSIGN, Literal: string(ch) + string(l.ch), Line: startLine, Column: startColumn}
 		} else {
 			tok = l.newToken(token.MINUS, l.ch)
 		}
@@ -95,10 +103,21 @@ func (l *Lexer) NextToken() token.Token {
 		if l.peekChar() == '/' {
 			l.skipComment()
 			return l.NextToken()
+		} else if l.peekChar() == '=' {
+			ch := l.ch
+			l.readChar()
+			tok = token.Token{Type: token.DIV_ASSIGN, Literal: string(ch) + string(l.ch), Line: startLine, Column: startColumn}
+		} else {
+			tok = l.newToken(token.SLASH, l.ch)
 		}
-		tok = l.newToken(token.SLASH, l.ch)
 	case '*':
-		tok = l.newToken(token.ASTERISK, l.ch)
+		if l.peekChar() == '=' {
+			ch := l.ch
+			l.readChar()
+			tok = token.Token{Type: token.MUL_ASSIGN, Literal: string(ch) + string(l.ch), Line: startLine, Column: startColumn}
+		} else {
+			tok = l.newToken(token.ASTERISK, l.ch)
+		}
 	case '<':
 		if l.peekChar() == '=' {
 			ch := l.ch
@@ -124,9 +143,25 @@ func (l *Lexer) NextToken() token.Token {
 			tok = l.newToken(token.GT, l.ch)
 		}
 	case '&':
-		tok = l.newToken(token.BIT_AND, l.ch)
+		if l.peekChar() == '&' {
+			ch := l.ch
+			l.readChar()
+			tok = token.Token{Type: token.AND, Literal: string(ch) + string(l.ch), Line: startLine, Column: startColumn}
+		} else {
+			tok = l.newToken(token.BIT_AND, l.ch)
+		}
 	case '|':
-		tok = l.newToken(token.BIT_OR, l.ch)
+		if l.peekChar() == '|' {
+			ch := l.ch
+			l.readChar()
+			tok = token.Token{Type: token.OR, Literal: string(ch) + string(l.ch), Line: startLine, Column: startColumn}
+		} else if l.peekChar() == '>' {
+			ch := l.ch
+			l.readChar()
+			tok = token.Token{Type: token.PIPE, Literal: string(ch) + string(l.ch), Line: startLine, Column: startColumn}
+		} else {
+			tok = l.newToken(token.BIT_OR, l.ch)
+		}
 	case '^':
 		tok = l.newToken(token.BIT_XOR, l.ch)
 	case '~':
