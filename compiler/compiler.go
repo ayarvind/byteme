@@ -365,6 +365,32 @@ func (c *Compiler) Compile(node ast.Node) error {
 			return fmt.Errorf("invalid compound assignment target")
 		}
 
+		if n.Operator == "&&" {
+			err := c.Compile(n.Left)
+			if err != nil { return err }
+			c.emit(code.OpDup)
+			jumpNotTruthyPos := c.emit(code.OpJumpNotTruthy, 9999)
+			c.emit(code.OpPop)
+			err = c.Compile(n.Right)
+			if err != nil { return err }
+			afterRightPos := len(c.instructions)
+			c.changeOperand(jumpNotTruthyPos, afterRightPos)
+			return nil
+		}
+
+		if n.Operator == "||" {
+			err := c.Compile(n.Left)
+			if err != nil { return err }
+			c.emit(code.OpDup)
+			jumpTruthyPos := c.emit(code.OpJumpTruthy, 9999)
+			c.emit(code.OpPop)
+			err = c.Compile(n.Right)
+			if err != nil { return err }
+			afterRightPos := len(c.instructions)
+			c.changeOperand(jumpTruthyPos, afterRightPos)
+			return nil
+		}
+
 		err := c.Compile(n.Left)
 		if err != nil { return err }
 
@@ -372,6 +398,27 @@ func (c *Compiler) Compile(node ast.Node) error {
 		if err != nil { return err }
 
 		return c.emitInfixOp(n.Operator)
+
+	case *ast.TernaryExpression:
+		err := c.Compile(n.Condition)
+		if err != nil { return err }
+
+		jumpNotTruthyPos := c.emit(code.OpJumpNotTruthy, 9999)
+
+		err = c.Compile(n.Consequence)
+		if err != nil { return err }
+
+		jumpToEndPos := c.emit(code.OpJump, 9999)
+
+		afterConsequencePos := len(c.instructions)
+		c.changeOperand(jumpNotTruthyPos, afterConsequencePos)
+
+		err = c.Compile(n.Alternative)
+		if err != nil { return err }
+
+		afterEndPos := len(c.instructions)
+		c.changeOperand(jumpToEndPos, afterEndPos)
+		return nil
 
 	case *ast.PrefixExpression:
 		if n.Operator == "++" || n.Operator == "--" {
@@ -1180,6 +1227,7 @@ var builtins = map[string]int{
 	"httpGet":        106,
 	"httpPost":       107,
 	"httpResponse":   108,
+	"httpDo":         109,
 	"int":           45,
 	"float":         46,
 	"string":        99,

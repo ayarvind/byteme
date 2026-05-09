@@ -56,6 +56,9 @@ func RegisterHTTPBuiltins() int {
 	// Index start+4: httpResponse(status, body)
 	Builtins = append(Builtins, &Builtin{Fn: builtinHTTPResponse})
 
+	// Index start+5: httpDo(method, url, body, headers)
+	Builtins = append(Builtins, &Builtin{Fn: builtinHTTPDo})
+
 	return start
 }
 
@@ -270,4 +273,66 @@ func builtinHTTPResponse(args ...Object) Object {
 		}
 	}
 	return res
+}
+
+// builtinHTTPDo performs an arbitrary HTTP request.
+// httpDo(method: string, url: string, body: string, headers: map) -> map{status, body, headers}
+func builtinHTTPDo(args ...Object) Object {
+	if len(args) < 2 {
+		return &Error{Message: "httpDo requires (method, url) arguments"}
+	}
+	method, ok1 := args[0].(*String)
+	urlStr, ok2 := args[1].(*String)
+	if !ok1 || !ok2 {
+		return &Error{Message: "httpDo: method and url must be strings"}
+	}
+
+	var bodyReader io.Reader
+	if len(args) >= 3 && args[2] != nil && args[2].Type() != NULL_OBJ {
+		if bodyStr, ok := args[2].(*String); ok {
+			bodyReader = strings.NewReader(bodyStr.Value)
+		} else {
+			// Fallback to inspect if not a string but passed
+			bodyReader = strings.NewReader(args[2].Inspect())
+		}
+	}
+
+	req, err := http.NewRequest(strings.ToUpper(method.Value), urlStr.Value, bodyReader)
+	if err != nil {
+		return &Error{Message: "httpDo: " + err.Error()}
+	}
+
+	// Default Content-Type for POST/PUT/PATCH if body is present
+	if bodyReader != nil && req.Header.Get("Content-Type") == "" {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	// Handle headers if provided
+	if len(args) >= 4 {
+		if headersMap, ok := args[3].(*Map); ok {
+			for k, v := range headersMap.Pairs {
+				req.Header.Set(k, v.Value.Inspect())
+			}
+		}
+	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return &Error{Message: "httpDo: " + err.Error()}
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, _ := io.ReadAll(resp.Body)
+
+	headers := NewStringMap(make(map[string]Object))
+	for k, v := range resp.Header {
+		headers.Pairs[k] = MapPair{Key: &String{Value: k}, Value: &String{Value: strings.Join(v, ", ")}}
+	}
+
+	return NewStringMap(map[string]Object{
+		"status":  &Integer{Value: int64(resp.StatusCode)},
+		"body":    &String{Value: string(bodyBytes)},
+		"headers": headers,
+	})
 }

@@ -239,6 +239,14 @@ func (vm *VM) Run() error {
 				vm.currentFrame().ip = pos - 1
 			}
 
+		case code.OpJumpTruthy:
+			pos := int(binary.BigEndian.Uint16(ins[ip+1:]))
+			vm.currentFrame().ip += 2
+			condition := vm.pop()
+			if isTruthy(condition) {
+				vm.currentFrame().ip = pos - 1
+			}
+
 		case code.OpSetGlobal:
 			globalIndex := binary.BigEndian.Uint16(ins[ip+1:])
 			vm.currentFrame().ip += 2

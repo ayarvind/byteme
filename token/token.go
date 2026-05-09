@@ -61,6 +61,7 @@ const (
 	DOT       TokenType = "."
 	AT        TokenType = "@"
 	MOD       TokenType = "%"
+	QUESTION  TokenType = "?"
 	LAMBDA_ARROW TokenType = "=>"
 
 	// Keywords

@@ -1,0 +1,59 @@
+import "lib/std.byme";
+import "lib/http.byme";
+
+// 1. Test Logical Operators
+println("--- Testing Logical Operators ---");
+let t = true;
+let f = false;
+
+println("true && false: " + (t && f)); // false
+println("true || false: " + (t || f)); // true
+
+// Short-circuiting test
+let counter = 0;
+fn increment() -> bool {
+    counter = counter + 1;
+    return true;
+}
+
+f && increment();
+println("Counter after false && increment(): " + counter); // should be 0
+
+t || increment();
+println("Counter after true || increment(): " + counter); // should be 0
+
+t && increment();
+println("Counter after true && increment(): " + counter); // should be 1
+
+// 2. Test Ternary Operator
+println("\n--- Testing Ternary Operator ---");
+let val = 10;
+let result = val > 5 ? "Greater" : "Smaller";
+println("10 > 5 ? Greater : Smaller -> " + result);
+
+// 3. Test HTTP Expansion
+println("\n--- Testing HTTP Expansion (PUT/DELETE) ---");
+let postData = map();
+mapSet(postData, "title", "Updated Title");
+
+let putRes = Http.put("https://jsonplaceholder.typicode.com/posts/1", postData);
+println("PUT status: " + putRes.status);
+
+let delRes = Http.delete("https://jsonplaceholder.typicode.com/posts/1");
+println("DELETE status: " + delRes.status);
+
+// 4. Test Custom Errors
+println("\n--- Testing Custom Errors ---");
+struct HttpError extends Error {
+    url: string
+}
+
+fn (e: HttpError) toString() -> string {
+    return "HttpError at " + e.url + ": " + e.message;
+}
+
+try {
+    throw HttpError("Not Found", 404, "https://example.com/api");
+} catch (e) {
+    println("Caught: " + e.toString());
+}

@@ -190,6 +190,8 @@ func (l *Lexer) NextToken() token.Token {
 		tok = l.newToken(token.AT, l.ch)
 	case '%':
 		tok = l.newToken(token.MOD, l.ch)
+	case '?':
+		tok = l.newToken(token.QUESTION, l.ch)
 	case '\'':
 		tok.Type = token.CHAR
 		tok.Literal = l.readCharLiteral()

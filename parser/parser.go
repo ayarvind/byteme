@@ -13,6 +13,9 @@ const (
 	_ int = iota
 	LOWEST
 	ASSIGN      // =
+	TERNARY     // ? :
+	OR          // ||
+	AND         // &&
 	PIPE        // |>
 	EQUALS      // ==
 	LESSGREATER // > or <
@@ -27,6 +30,9 @@ const (
 
 var precedences = map[token.TokenType]int{
 	token.ASSIGN:   ASSIGN,
+	token.QUESTION: TERNARY,
+	token.OR:       OR,
+	token.AND:      AND,
 	token.EQ:       EQUALS,
 	token.NOT_EQ:   EQUALS,
 	token.LT:       LESSGREATER,
@@ -101,6 +107,9 @@ func (p *Parser) registerParsers() {
 	p.registerInfix(token.GT, p.parseInfixExpression)
 	p.registerInfix(token.LTE, p.parseInfixExpression)
 	p.registerInfix(token.GTE, p.parseInfixExpression)
+	p.registerInfix(token.AND, p.parseInfixExpression)
+	p.registerInfix(token.OR, p.parseInfixExpression)
+	p.registerInfix(token.QUESTION, p.parseTernaryExpression)
 	p.registerInfix(token.LPAREN, p.parseCallExpression)
 	p.registerInfix(token.LBRACKET, p.parseIndexExpression)
 	p.registerInfix(token.ASSIGN, p.parseInfixExpression) // Treat as infix
@@ -799,6 +808,25 @@ func (p *Parser) parsePrefixExpression() ast.Expression {
 	p.nextToken()
 
 	expression.Right = p.parseExpression(PREFIX)
+
+	return expression
+}
+
+func (p *Parser) parseTernaryExpression(condition ast.Expression) ast.Expression {
+	expression := &ast.TernaryExpression{
+		Token:     p.curToken,
+		Condition: condition,
+	}
+
+	p.nextToken() // consume '?'
+	expression.Consequence = p.parseExpression(TERNARY)
+
+	if !p.expectPeek(token.COLON) {
+		return nil
+	}
+
+	p.nextToken() // consume ':'
+	expression.Alternative = p.parseExpression(TERNARY - 1)
 
 	return expression
 }

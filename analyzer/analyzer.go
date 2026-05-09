@@ -26,6 +26,7 @@ type Analyzer struct {
 	interfaces        map[string][]*ast.MethodSignature
 	currentReturnType string
 	funcSignatures    map[string]FunctionSignature
+	builtinSignatures map[string]FunctionSignature
 	source            string
 	filename          string
 	lines             []string
@@ -86,6 +87,7 @@ func New(env *environment.Environment, source string, filename string) *Analyzer
 	env.Set("httpGet",      "function", environment.PUBLIC, true)
 	env.Set("httpPost",     "function", environment.PUBLIC, true)
 	env.Set("httpResponse", "function", environment.PUBLIC, true)
+	env.Set("httpDo",       "function", environment.PUBLIC, true)
 	
 	env.Set("toInt",        "function", environment.PUBLIC, true)
 	env.Set("toFloat",      "function", environment.PUBLIC, true)
@@ -174,20 +176,31 @@ func New(env *environment.Environment, source string, filename string) *Analyzer
 		interfaces:        make(map[string][]*ast.MethodSignature),
 		currentReturnType: "",
 		funcSignatures:    make(map[string]FunctionSignature),
+		builtinSignatures: make(map[string]FunctionSignature),
 		source:            source,
 		filename:          filename,
 		lines:             strings.Split(source, "\n"),
 	}
 	
 	// Register built-in signatures
-	a.funcSignatures["len"] = FunctionSignature{Params: []string{"any"}, Return: "int"}
-	a.funcSignatures["println"] = FunctionSignature{Params: []string{"any"}, Return: "void"}
-	a.funcSignatures["mapSet"] = FunctionSignature{Params: []string{"map", "any", "any"}, Return: "void"}
-	a.funcSignatures["mapGet"] = FunctionSignature{Params: []string{"map", "any"}, Return: "any"}
-	a.funcSignatures["mapHas"] = FunctionSignature{Params: []string{"map", "any"}, Return: "bool"}
-	a.funcSignatures["arrayLen"] = FunctionSignature{Params: []string{"array"}, Return: "int"}
-	a.funcSignatures["arrayPush"] = FunctionSignature{Params: []string{"array", "any"}, Return: "void"}
-	a.funcSignatures["generator"] = FunctionSignature{Params: []string{}, Return: "Iterator"}
+	a.builtinSignatures["len"] = FunctionSignature{Params: []string{"any"}, Return: "int"}
+	a.builtinSignatures["println"] = FunctionSignature{Params: []string{"any"}, Return: "void"}
+	a.builtinSignatures["httpGet"] = FunctionSignature{Params: []string{"string"}, Return: "map"}
+	a.builtinSignatures["httpPost"] = FunctionSignature{Params: []string{"string", "string"}, Return: "map"}
+	a.builtinSignatures["httpDo"] = FunctionSignature{Params: []string{"string", "string", "string", "map"}, Return: "map"}
+	a.builtinSignatures["httpResponse"] = FunctionSignature{Params: []string{"int", "string"}, Return: "map"}
+	a.builtinSignatures["typeof"] = FunctionSignature{Params: []string{"any"}, Return: "string"}
+	a.builtinSignatures["toString"] = FunctionSignature{Params: []string{"any"}, Return: "string"}
+	a.builtinSignatures["toInt"] = FunctionSignature{Params: []string{"any"}, Return: "int"}
+	a.builtinSignatures["toFloat"] = FunctionSignature{Params: []string{"any"}, Return: "float"}
+	a.builtinSignatures["jsonParse"] = FunctionSignature{Params: []string{"string"}, Return: "any"}
+	a.builtinSignatures["jsonStringify"] = FunctionSignature{Params: []string{"any"}, Return: "string"}
+	a.builtinSignatures["mapSet"] = FunctionSignature{Params: []string{"map", "any", "any"}, Return: "void"}
+	a.builtinSignatures["mapGet"] = FunctionSignature{Params: []string{"map", "any"}, Return: "any"}
+	a.builtinSignatures["mapHas"] = FunctionSignature{Params: []string{"map", "any"}, Return: "bool"}
+	a.builtinSignatures["arrayLen"] = FunctionSignature{Params: []string{"array"}, Return: "int"}
+	a.builtinSignatures["arrayPush"] = FunctionSignature{Params: []string{"array", "any"}, Return: "void"}
+	a.builtinSignatures["generator"] = FunctionSignature{Params: []string{}, Return: "Iterator"}
 	
 	return a
 }
@@ -613,6 +626,15 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 			}
 			return "any"
 		}
+		if n.Operator == "&&" || n.Operator == "||" {
+			leftType := a.Analyze(n.Left)
+			rightType := a.Analyze(n.Right)
+			if leftType == rightType {
+				return leftType
+			}
+			return leftType + "|" + rightType
+		}
+
 		if n.Operator == "=" || n.Operator == "+=" || n.Operator == "-=" || n.Operator == "*=" || n.Operator == "/=" {
 			leftType := a.Analyze(n.Left)
 			rightType := a.Analyze(n.Right)
@@ -831,6 +853,15 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 		a.structFields[n.Name.Value] = fields
 		return "type"
 
+	case *ast.TernaryExpression:
+		a.Analyze(n.Condition)
+		consequenceType := a.Analyze(n.Consequence)
+		alternativeType := a.Analyze(n.Alternative)
+		if consequenceType == alternativeType {
+			return consequenceType
+		}
+		return consequenceType + "|" + alternativeType
+
 	case *ast.CallExpression:
 		a.Analyze(n.Function)
 		
@@ -840,12 +871,16 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 		}
 		
 		if ident, ok := n.Function.(*ast.Identifier); ok {
-			// Check signature
+			// Check registered built-in signatures first
+			if sig, ok := a.builtinSignatures[ident.Value]; ok {
+				return sig.Return
+			}
+
+			// Check user-defined function signatures
 			if sig, ok := a.funcSignatures[ident.Value]; ok {
 				if len(n.Arguments) != len(sig.Params) && ident.Value != "println" && ident.Value != "generator" {
 					a.error(n.Token, "wrong number of arguments for %s: expected %d, got %d", ident.Value, len(sig.Params), len(n.Arguments))
 				} else {
-					// Check argument types
 					for i := range n.Arguments {
 						if i >= len(sig.Params) { break }
 						argType := argTypes[i]
@@ -855,26 +890,19 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 						}
 					}
 				}
+				return sig.Return
 			}
 
-			// Built-in return type deduction
+			// Built-in return type deduction (Legacy fallback)
 			switch ident.Value {
-			case "map":
-				return "map"
-			case "array":
-				return "array"
-			case "generator":
-				return "Iterator"
-			case "len", "arrayLen", "toInt", "strIndex", "strLastIndex", "strCount":
-				return "int"
-			case "toFloat":
-				return "float"
-			case "toString", "typeof", "strToLower", "strToUpper", "strTrim", "strTrimSpace", "strJoin", "strReplace", "strRepeat", "strTrimLeft", "strTrimRight", "strReverse", "jsonStringify":
-				return "string"
-			case "toChar", "charAt":
-				return "char"
-			case "strContains", "strHasPrefix", "strHasSuffix", "strIsAlpha", "strIsDigit", "strIsSpace", "mapHas", "osExists", "osIsdir", "osIsfile", "regexMatch":
-				return "bool"
+			case "map": return "map"
+			case "array": return "array"
+			case "generator": return "Iterator"
+			case "len", "arrayLen", "toInt", "strIndex", "strLastIndex", "strCount": return "int"
+			case "toFloat": return "float"
+			case "toString", "typeof", "strToLower", "strToUpper", "strTrim", "strTrimSpace", "strJoin", "strReplace", "strRepeat", "strTrimLeft", "strTrimRight", "strReverse", "jsonStringify": return "string"
+			case "toChar", "charAt": return "char"
+			case "strContains", "strHasPrefix", "strHasSuffix", "strIsAlpha", "strIsDigit", "strIsSpace", "mapHas", "osExists", "osIsdir", "osIsfile", "regexMatch": return "bool"
 			}
 
 			sym, ok := a.env.Get(ident.Value)

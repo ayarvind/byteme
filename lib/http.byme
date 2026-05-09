@@ -23,29 +23,49 @@ fn (r: Response) isOk() -> bool {
 // HttpUtility provides methods for making HTTP requests.
 struct HttpUtility {}
 
-// get performs an HTTP GET request to the specified URL.
-fn (u: HttpUtility) get(url) -> Response {
-    let res = httpGet(url);
-    return Response(res.status, res.body, res.headers);
-}
-
-// post performs an HTTP POST request to the specified URL.
-// The body can be a string or a map/array (which will be stringified as JSON).
-fn (u: HttpUtility) post(url, body) -> Response {
+// request performs a generic HTTP request with a specified method.
+fn (u: HttpUtility) request(method, url, body, headers) -> Response {
     let payload = body;
     let t = typeof(body);
-    if (t == "map") {
+    if (t == "map" || t == "array") {
         payload = jsonStringify(body);
-    } else {
-        if (t == "array") {
-            payload = jsonStringify(body);
-        }
     }
-    let res = httpPost(url, payload);
+    
+    let res = httpDo(method, url, payload, headers);
     if (typeof(res) == "ERROR") {
         return Response(0, toString(res), map());
     }
     return Response(res.status, res.body, res.headers);
+}
+
+// get performs an HTTP GET request.
+fn (u: HttpUtility) get(url) -> Response {
+    return u.request("GET", url, "", map());
+}
+
+// post performs an HTTP POST request.
+fn (u: HttpUtility) post(url, body) -> Response {
+    return u.request("POST", url, body, map());
+}
+
+// put performs an HTTP PUT request.
+fn (u: HttpUtility) put(url, body) -> Response {
+    return u.request("PUT", url, body, map());
+}
+
+// patch performs an HTTP PATCH request.
+fn (u: HttpUtility) patch(url, body) -> Response {
+    return u.request("PATCH", url, body, map());
+}
+
+// delete performs an HTTP DELETE request.
+fn (u: HttpUtility) delete(url) -> Response {
+    return u.request("DELETE", url, "", map());
+}
+
+// options performs an HTTP OPTIONS request.
+fn (u: HttpUtility) options(url) -> Response {
+    return u.request("OPTIONS", url, "", map());
 }
 
 // urlWithParams appends query parameters to a base URL.
@@ -56,15 +76,11 @@ fn (u: HttpUtility) urlWithParams(baseUrl, params) -> string {
     while (i < len(keys)) {
         let key = keys[i];
         let val = toString(mapGet(params, key));
-        if (i > 0) { query = query + "&"; }
-        query = query + key + "=" + val;
+        query = query + (i > 0 ? "&" : "") + key + "=" + val;
         i = i + 1;
     }
     
-    if (len(query) > 0) {
-        return baseUrl + "?" + query;
-    }
-    return baseUrl;
+    return len(query) > 0 ? baseUrl + "?" + query : baseUrl;
 }
 
 // Export the Http utility

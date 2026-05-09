@@ -37,6 +37,7 @@ const (
 	OpReturn
 	OpJump
 	OpJumpNotTruthy
+	OpJumpTruthy
 	OpSetGlobal
 	OpGetGlobal
 	OpNull
@@ -102,6 +103,7 @@ var definitions = map[Opcode]*Definition{
 	OpReturn:      {"OpReturn", []int{}},
 	OpJump:          {"OpJump", []int{2}},          // 2-byte jump destination
 	OpJumpNotTruthy: {"OpJumpNotTruthy", []int{2}}, // 2-byte jump destination
+	OpJumpTruthy:    {"OpJumpTruthy", []int{2}},    // 2-byte jump destination
 	OpSetGlobal:     {"OpSetGlobal", []int{2}},
 	OpGetGlobal:     {"OpGetGlobal", []int{2}},
 	OpNull:          {"OpNull", []int{}},
