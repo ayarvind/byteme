@@ -17,10 +17,45 @@ import (
 	"github.com/byteme/compiler/parser"
 	"github.com/byteme/compiler/object"
 	"github.com/byteme/compiler/repl"
+	"github.com/byteme/compiler/token"
 	"github.com/byteme/compiler/vm"
 	"math/rand"
+	"strings"
 	"time"
 )
+
+var keywordHelp = map[string]string{
+	"let":       "Keyword: let - Declares a block-scoped variable.",
+	"const":     "Keyword: const - Declares a block-scoped constant.",
+	"fn":        "Keyword: fn - Declares a function.",
+	"if":        "Keyword: if - Conditional execution.",
+	"else":      "Keyword: else - Alternative conditional branch.",
+	"while":     "Keyword: while - Loop while condition is true.",
+	"for":       "Keyword: for - Loop construct.",
+	"in":        "Keyword: in - Used in for-each loops.",
+	"return":    "Keyword: return - Exit function and return a value.",
+	"struct":    "Keyword: struct - Defines a structured type.",
+	"enum":      "Keyword: enum - Defines an enumeration.",
+	"interface": "Keyword: interface - Defines a contract.",
+	"import":    "Keyword: import - Includes another module.",
+	"from":      "Keyword: from - Used in specific imports.",
+	"as":        "Keyword: as - Aliasing in imports.",
+	"spawn":     "Keyword: spawn - Concurrency primitive.",
+	"await":     "Keyword: await - Wait for async operation.",
+	"async":     "Keyword: async - Declares an asynchronous function.",
+	"try":       "Keyword: try - Error handling block.",
+	"catch":     "Keyword: catch - Handle thrown errors.",
+	"finally":   "Keyword: finally - Cleanup block.",
+	"throw":     "Keyword: throw - Raise an error.",
+	"yield":     "Keyword: yield - Yield a value in a generator.",
+	"int":       "Type: int - 64-bit integer.",
+	"float":     "Type: float - 64-bit floating point number.",
+	"string":    "Type: string - UTF-8 encoded string.",
+	"bool":      "Type: bool - Boolean value (true or false).",
+	"char":      "Type: char - Single Unicode character.",
+	"any":       "Type: any - Dynamic type that can hold any value.",
+	"void":      "Type: void - Represents the absence of a value.",
+}
 
 func init() {
 	rand.Seed(time.Now().UnixNano())
@@ -49,6 +84,8 @@ func main() {
 	useEvaluator := flag.Bool("eval", false, "use the tree-walk evaluator instead of VM")
 	disassemble := flag.Bool("d", false, "disassemble bytecode")
 	lintOnly := flag.Bool("lint", false, "lint only (lexer, parser, and semantic analysis)")
+	hoverPos := flag.String("hover", "", "get hover info at file:line:col")
+	defPos := flag.String("definition", "", "get definition at file:line:col")
 	flag.Parse()
 
 	if len(flag.Args()) < 1 {
@@ -79,6 +116,83 @@ func main() {
 	env := environment.NewEnvironment()
 	a := analyzer.New(env, string(input), filename)
 	a.Analyze(program)
+	
+	// If we are just linting, we exit on errors.
+	// But for hover/definition, we want to provide info even if the program has errors elsewhere.
+	if *lintOnly && len(a.Errors()) != 0 {
+		printErrors("Analyzer", a.Errors())
+		os.Exit(1)
+	}
+
+	if *hoverPos != "" {
+		targetFile, targetLine, targetCol, err := parsePos(*hoverPos)
+		if err != nil {
+			fmt.Printf("Invalid hover position format: %s\n", err)
+			os.Exit(1)
+		}
+
+		var bestSym *environment.Symbol
+		for key, sym := range a.ResolvedSymbols {
+			kFile, kLine, kCol, _ := parsePos(key)
+			if kFile == targetFile && kLine == targetLine {
+				if targetCol >= kCol && targetCol < kCol+len(sym.Name) {
+					bestSym = &sym
+					break
+				}
+			}
+		}
+
+		if bestSym != nil {
+			fmt.Printf("Type: %s\n", bestSym.Type)
+			if bestSym.IsConst {
+				fmt.Println("Constant")
+			}
+		} else {
+			// Check for keywords or other tokens
+			tokLit, ok := findToken(string(input), targetLine, targetCol)
+			if ok {
+				if help, ok := keywordHelp[tokLit]; ok {
+					fmt.Println(help)
+				} else {
+					fmt.Println("No information found at this position.")
+				}
+			} else {
+				fmt.Println("No information found at this position.")
+			}
+		}
+		return
+	}
+
+	if *defPos != "" {
+		targetFile, targetLine, targetCol, err := parsePos(*defPos)
+		if err != nil {
+			fmt.Printf("Invalid definition position format: %s\n", err)
+			os.Exit(1)
+		}
+
+		var bestSym *environment.Symbol
+		for key, sym := range a.ResolvedSymbols {
+			kFile, kLine, kCol, _ := parsePos(key)
+			if kFile == targetFile && kLine == targetLine {
+				if targetCol >= kCol && targetCol < kCol+len(sym.Name) {
+					bestSym = &sym
+					break
+				}
+			}
+		}
+
+		if bestSym != nil {
+			if bestSym.Filename != "" {
+				fmt.Printf("Definition: %s:%d:%d\n", bestSym.Filename, bestSym.Line, bestSym.Column)
+			} else {
+				fmt.Println("Built-in symbol.")
+			}
+		} else {
+			fmt.Println("No definition found at this position.")
+		}
+		return
+	}
+
 	if len(a.Errors()) != 0 {
 		printErrors("Analyzer", a.Errors())
 		os.Exit(1)
@@ -87,11 +201,6 @@ func main() {
 	// 4. Optimization
 	opt := optimizer.New()
 	optimized := opt.Optimize(program).(*ast.Program)
-
-	if *lintOnly {
-		fmt.Println("No lint errors found.")
-		return
-	}
 
 	if *disassemble {
 		comp := compiler.New()
@@ -158,6 +267,47 @@ func main() {
 			fmt.Println(lastStackElem.Inspect())
 		}
 	}
+}
+
+func parsePos(pos string) (string, int, int, error) {
+	lastColon := strings.LastIndex(pos, ":")
+	if lastColon == -1 {
+		return "", 0, 0, fmt.Errorf("missing last colon")
+	}
+	secondLastColon := strings.LastIndex(pos[:lastColon], ":")
+	if secondLastColon == -1 {
+		return "", 0, 0, fmt.Errorf("missing second last colon")
+	}
+
+	file := pos[:secondLastColon]
+	// Normalize path for Windows consistency
+	file = strings.ToLower(strings.ReplaceAll(file, "\\", "/"))
+	
+	lineStr := pos[secondLastColon+1 : lastColon]
+	colStr := pos[lastColon+1:]
+
+	var line, col int
+	fmt.Sscanf(lineStr, "%d", &line)
+	fmt.Sscanf(colStr, "%d", &col)
+
+	return file, line, col, nil
+}
+
+func findToken(source string, line, col int) (string, bool) {
+	l := lexer.New(source)
+	for {
+		tok := l.NextToken()
+		if tok.Type == token.EOF {
+			break
+		}
+		if tok.Line == line && col >= tok.Column && col < tok.Column+len(tok.Literal) {
+			return tok.Literal, true
+		}
+		if tok.Line > line {
+			break
+		}
+	}
+	return "", false
 }
 
 func printErrors(phase string, errors []string) {

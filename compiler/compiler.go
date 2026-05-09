@@ -909,7 +909,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 					Definition: enumDef,
 					Variant:    variantName,
 				}
-				nsEnv.Set(variantName, "ENUM_INSTANCE", environment.PUBLIC, true)
+				nsEnv.Set(variantName, "ENUM_INSTANCE", environment.PUBLIC, true, "", 0, 0)
 				nsEnv.SetVal(variantName, instance)
 			} else {
 				// Otherwise create a constructor
@@ -917,7 +917,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 					Definition: enumDef,
 					Variant:    variantName,
 				}
-				nsEnv.Set(variantName, "ENUM_CONSTRUCTOR", environment.PUBLIC, true)
+				nsEnv.Set(variantName, "ENUM_CONSTRUCTOR", environment.PUBLIC, true, "", 0, 0)
 				nsEnv.SetVal(variantName, constructor)
 			}
 		}

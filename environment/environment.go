@@ -13,10 +13,13 @@ const (
 )
 
 type Symbol struct {
-	Name   string
-	Type   string
-	Access AccessModifier
-	IsConst bool
+	Name     string
+	Type     string
+	Access   AccessModifier
+	IsConst  bool
+	Filename string
+	Line     int
+	Column   int
 }
 
 type Environment struct {
@@ -39,13 +42,21 @@ func NewEnclosedEnvironment(outer *Environment) *Environment {
 	return env
 }
 
-func (e *Environment) Set(name string, typeName string, access AccessModifier, isConst bool) error {
+func (e *Environment) Set(name string, typeName string, access AccessModifier, isConst bool, filename string, line, col int) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if _, ok := e.store[name]; ok {
 		return fmt.Errorf("symbol %s already defined in this scope", name)
 	}
-	e.store[name] = Symbol{Name: name, Type: typeName, Access: access, IsConst: isConst}
+	e.store[name] = Symbol{
+		Name: name, 
+		Type: typeName, 
+		Access: access, 
+		IsConst: isConst,
+		Filename: filename,
+		Line: line,
+		Column: col,
+	}
 	return nil
 }
 
