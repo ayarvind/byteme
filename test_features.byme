@@ -1,16 +1,16 @@
 // This is a docstring for the greet function
-fn greet(name: string) {
+fn greet(name: string) -> string {
     let message = `Hello, ${name}!`;
-    println(message);
+    return message;
 }
 
-greet("ByteMe");
+let result = greet("ByteMe");
+println(result);
 
 struct User {
     name: string
+    age: int
 }
 
-interface IGreet {
-    // Greets the user
-    fn greet(u: User)
-}
+let u = User("Alice", 25);
+println(u.name);

@@ -67,7 +67,7 @@ fn appNew(port) {
     return App(port);
 }
 
-fn (app: App) route(path, handler) {
+fn (app: App) route(path:string, handler: fn(Request) -> Response) {
     httpHandle(path, handler);
 }
 

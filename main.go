@@ -144,6 +144,10 @@ func main() {
 
 		if bestSym != nil {
 			fmt.Printf("Type: %s\n", bestSym.Type)
+			if bestSym.Type == "function" || bestSym.Type == "builtin" {
+				params := strings.Join(bestSym.Params, ", ")
+				fmt.Printf("Signature: fn(%s) -> %s\n", params, bestSym.ReturnType)
+			}
 			if bestSym.Docstring != "" {
 				fmt.Printf("\n%s\n", bestSym.Docstring)
 			}

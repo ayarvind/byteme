@@ -21,6 +21,8 @@ type Symbol struct {
 	Line     int
 	Column   int
 	Docstring string
+	Params    []string
+	ReturnType string
 }
 
 type Environment struct {
@@ -58,8 +60,20 @@ func (e *Environment) Set(name string, typeName string, access AccessModifier, i
 		Line: line,
 		Column: col,
 		Docstring: doc,
+		Params:    nil,
+		ReturnType: "",
 	}
 	return nil
+}
+
+func (e *Environment) SetSignature(name string, params []string, retType string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if sym, ok := e.store[name]; ok {
+		sym.Params = params
+		sym.ReturnType = retType
+		e.store[name] = sym
+	}
 }
 
 func (e *Environment) Get(name string) (Symbol, bool) {

@@ -1334,6 +1334,30 @@ func (p *Parser) registerInfix(tokenType token.TokenType, fn infixParseFn) {
 func (p *Parser) parseTypeString() string {
 	typeName := p.curToken.Literal
 
+	// Handle function types like fn(string, int) -> bool
+	if typeName == "fn" && p.peekTokenIs(token.LPAREN) {
+		p.nextToken() // (
+		typeName += "("
+		for !p.peekTokenIs(token.RPAREN) && !p.peekTokenIs(token.EOF) {
+			p.nextToken()
+			typeName += p.parseTypeString()
+			if p.peekTokenIs(token.COMMA) {
+				p.nextToken()
+				typeName += ", "
+			}
+		}
+		if p.peekTokenIs(token.RPAREN) {
+			p.nextToken()
+			typeName += ")"
+		}
+		if p.peekTokenIs(token.ARROW) {
+			p.nextToken() // ->
+			p.nextToken() // return type
+			typeName += " -> " + p.parseTypeString()
+		}
+		return typeName
+	}
+
 	// Handle generics like array<int>
 	if p.peekTokenIs(token.LT) {
 		p.nextToken() // <

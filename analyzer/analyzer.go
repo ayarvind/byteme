@@ -211,6 +211,19 @@ func New(env *environment.Environment, source string, filename string) *Analyzer
 	a.builtinSignatures["arrayLen"] = FunctionSignature{Params: []string{"array"}, Return: "int"}
 	a.builtinSignatures["arrayPush"] = FunctionSignature{Params: []string{"array", "any"}, Return: "void"}
 	a.builtinSignatures["generator"] = FunctionSignature{Params: []string{}, Return: "Iterator"}
+	a.builtinSignatures["httpHandle"] = FunctionSignature{Params: []string{"string", "function"}, Return: "void"}
+	a.builtinSignatures["httpServe"] = FunctionSignature{Params: []string{"int"}, Return: "void"}
+	a.builtinSignatures["mapKeys"] = FunctionSignature{Params: []string{"map"}, Return: "array"}
+	a.builtinSignatures["osExists"] = FunctionSignature{Params: []string{"string"}, Return: "bool"}
+	a.builtinSignatures["fileRead"] = FunctionSignature{Params: []string{"string"}, Return: "string"}
+	a.builtinSignatures["fileWrite"] = FunctionSignature{Params: []string{"string", "string"}, Return: "void"}
+	a.builtinSignatures["strSplit"] = FunctionSignature{Params: []string{"string", "string"}, Return: "array"}
+	a.builtinSignatures["strReplace"] = FunctionSignature{Params: []string{"string", "string", "string", "int"}, Return: "string"}
+	
+	// Populate signatures in environment
+	for name, sig := range a.builtinSignatures {
+		a.env.SetSignature(name, sig.Params, sig.Return)
+	}
 	
 	return a
 }
@@ -923,7 +936,7 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 
 
 	case *ast.StructLiteral:
-		a.env.Set(n.Name.Value, "type", environment.PUBLIC, true, a.filename, n.Name.Token.Line, n.Name.Token.Column, "")
+		a.env.Set(n.Name.Value, "struct", environment.PUBLIC, true, a.filename, n.Name.Token.Line, n.Name.Token.Column, "")
 		if n.Parent != nil {
 			a.structParents[n.Name.Value] = n.Parent.Value
 		}
@@ -932,7 +945,7 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 			fields[f.Name.Value] = f.Type
 		}
 		a.structFields[n.Name.Value] = fields
-		return "type"
+		return "struct"
 
 	case *ast.TernaryExpression:
 		a.Analyze(n.Condition)
@@ -987,7 +1000,7 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 			}
 
 			sym, ok := a.env.Get(ident.Value)
-			if ok && sym.Type == "type" {
+			if ok && (sym.Type == "struct" || sym.Type == "type") {
 				return ident.Value
 			}
 		} else if dot, ok := n.Function.(*ast.InfixExpression); ok && (dot.Operator == "." || dot.Operator == "::") {
@@ -996,7 +1009,7 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 				if rightIdent, ok := dot.Right.(*ast.Identifier); ok {
 					compoundKey := leftIdent.Value + "." + rightIdent.Value
 					if sym, ok := a.env.Get(compoundKey); ok {
-						if sym.Type == "type" {
+						if sym.Type == "struct" || sym.Type == "type" {
 							return compoundKey
 						}
 						if sym.Type == "function" {
@@ -1153,6 +1166,13 @@ func (a *Analyzer) preScan(stmt ast.Statement) {
 				a.env.Set(expr.Name.Value, "function", environment.PUBLIC, true, a.filename, expr.Name.Token.Line, expr.Name.Token.Column, expr.Docstring)
 				// Record definition
 				key := fmt.Sprintf("%s:%d:%d", a.filename, expr.Name.Token.Line, expr.Name.Token.Column)
+				sig := FunctionSignature{Return: expr.ReturnType}
+				for _, p := range expr.Parameters {
+					sig.Params = append(sig.Params, p.Type)
+				}
+				
+				a.env.SetSignature(expr.Name.Value, sig.Params, sig.Return)
+
 				a.ResolvedSymbols[key] = environment.Symbol{
 					Name:     expr.Name.Value,
 					Type:     "function",
@@ -1160,10 +1180,8 @@ func (a *Analyzer) preScan(stmt ast.Statement) {
 					Line:     expr.Name.Token.Line,
 					Column:   expr.Name.Token.Column,
 					Docstring: expr.Docstring,
-				}
-				sig := FunctionSignature{Return: expr.ReturnType}
-				for _, p := range expr.Parameters {
-					sig.Params = append(sig.Params, p.Type)
+					Params:    sig.Params,
+					ReturnType: sig.Return,
 				}
 
 				if expr.Receiver != nil {
@@ -1177,15 +1195,32 @@ func (a *Analyzer) preScan(stmt ast.Statement) {
 				}
 			}
 		case *ast.StructLiteral:
-			a.env.Set(expr.Name.Value, "type", environment.PUBLIC, true, a.filename, expr.Name.Token.Line, expr.Name.Token.Column, "")
+			a.env.Set(expr.Name.Value, "struct", environment.PUBLIC, true, a.filename, expr.Name.Token.Line, expr.Name.Token.Column, "")
 			if expr.Parent != nil {
 				a.structParents[expr.Name.Value] = expr.Parent.Value
 			}
 			fields := make(map[string]string)
+			fieldList := []string{}
 			for _, f := range expr.Fields {
 				fields[f.Name.Value] = f.Type
+				fieldList = append(fieldList, f.Name.Value+": "+f.Type)
 			}
 			a.structFields[expr.Name.Value] = fields
+
+			// Record struct definition for hover
+			key := fmt.Sprintf("%s:%d:%d", a.filename, expr.Name.Token.Line, expr.Name.Token.Column)
+			fieldDoc := "Fields: " + strings.Join(fieldList, ", ")
+			if expr.Parent != nil {
+				fieldDoc = "extends " + expr.Parent.Value + " | " + fieldDoc
+			}
+			a.ResolvedSymbols[key] = environment.Symbol{
+				Name:     expr.Name.Value,
+				Type:     "struct",
+				Filename: a.filename,
+				Line:     expr.Name.Token.Line,
+				Column:   expr.Name.Token.Column,
+				Docstring: fieldDoc,
+			}
 		}
 	case *ast.InterfaceStatement:
 		a.env.Set(s.Name.Value, "interface", environment.PUBLIC, true, a.filename, s.Name.Token.Line, s.Name.Token.Column, "")
