@@ -144,9 +144,34 @@ func main() {
 
 		if bestSym != nil {
 			fmt.Printf("Type: %s\n", bestSym.Type)
-			if bestSym.Type == "function" || bestSym.Type == "builtin" {
-				params := strings.Join(bestSym.Params, ", ")
-				fmt.Printf("Signature: fn(%s) -> %s\n", params, bestSym.ReturnType)
+			
+			// Resolve struct info for instances
+			infoSym := bestSym
+			if bestSym.Type != "struct" && bestSym.Type != "function" && bestSym.Type != "builtin" && 
+			   bestSym.Type != "int" && bestSym.Type != "float" && bestSym.Type != "string" && 
+			   bestSym.Type != "bool" && bestSym.Type != "char" && bestSym.Type != "array" && 
+			   bestSym.Type != "map" && bestSym.Type != "any" && bestSym.Type != "void" {
+				for _, s := range a.ResolvedSymbols {
+					if s.Name == bestSym.Type && s.Type == "struct" {
+						infoSym = &s
+						break
+					}
+				}
+			}
+
+			if infoSym.Type == "function" || infoSym.Type == "builtin" {
+				params := strings.Join(infoSym.Params, ", ")
+				fmt.Printf("Signature: fn(%s) -> %s\n", params, infoSym.ReturnType)
+			}
+			if infoSym.Type == "struct" {
+				fmt.Printf("Fields (%d):\n", len(infoSym.Fields))
+				for _, f := range infoSym.Fields {
+					fmt.Printf("  - %s\n", f)
+				}
+				fmt.Printf("Methods (%d):\n", len(infoSym.Methods))
+				for _, m := range infoSym.Methods {
+					fmt.Printf("  - %s\n", m)
+				}
 			}
 			if bestSym.Docstring != "" {
 				fmt.Printf("\n%s\n", bestSym.Docstring)

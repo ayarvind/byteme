@@ -10,6 +10,7 @@ import (
 	"github.com/byteme/compiler/parser"
 	"github.com/byteme/compiler/token"
 	"path/filepath"
+	"sort"
 	"strings"
 )
  
@@ -467,6 +468,33 @@ func (a *Analyzer) Analyze(node ast.Node) string {
 		for _, stmt := range n.Statements {
 			a.preScan(stmt)
 		}
+
+		// Enrich struct symbols with fields and methods
+		for structName := range a.structFields {
+			var fields []string
+			for fName, fType := range a.structFields[structName] {
+				fields = append(fields, fName+": "+fType)
+			}
+			sort.Strings(fields)
+			
+			var methods []string
+			if mList, ok := a.structMethods[structName]; ok {
+				for mName, mSig := range mList {
+					methods = append(methods, fmt.Sprintf("%s(%s) -> %s", mName, strings.Join(mSig.Params, ", "), mSig.Return))
+				}
+			}
+			sort.Strings(methods)
+			a.env.SetStructInfo(structName, fields, methods)
+
+			// Also update the definition symbol in ResolvedSymbols
+			if sym, ok := a.env.Get(structName); ok {
+				key := fmt.Sprintf("%s:%d:%d", sym.Filename, sym.Line, sym.Column)
+				if _, exists := a.ResolvedSymbols[key]; exists {
+					a.ResolvedSymbols[key] = sym
+				}
+			}
+		}
+
 		for _, stmt := range n.Statements {
 			a.Analyze(stmt)
 		}

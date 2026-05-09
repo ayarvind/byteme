@@ -23,6 +23,8 @@ type Symbol struct {
 	Docstring string
 	Params    []string
 	ReturnType string
+	Fields     []string
+	Methods    []string
 }
 
 type Environment struct {
@@ -62,6 +64,8 @@ func (e *Environment) Set(name string, typeName string, access AccessModifier, i
 		Docstring: doc,
 		Params:    nil,
 		ReturnType: "",
+		Fields:     nil,
+		Methods:    nil,
 	}
 	return nil
 }
@@ -72,6 +76,16 @@ func (e *Environment) SetSignature(name string, params []string, retType string)
 	if sym, ok := e.store[name]; ok {
 		sym.Params = params
 		sym.ReturnType = retType
+		e.store[name] = sym
+	}
+}
+
+func (e *Environment) SetStructInfo(name string, fields []string, methods []string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if sym, ok := e.store[name]; ok {
+		sym.Fields = fields
+		sym.Methods = methods
 		e.store[name] = sym
 	}
 }
